@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2e7d32">
+<meta name="description" content="broco Nihongo 운영 콘솔">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20x%3D%2228%22%20y%3D%2234%22%20width%3D%228%22%20height%3D%2224%22%20rx%3D%224%22%20fill%3D%22%235d8a3a%22/%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2228%22%20r%3D%2213%22%20fill%3D%22%232e7d32%22/%3E%3Ccircle%20cx%3D%2244%22%20cy%3D%2228%22%20r%3D%2213%22%20fill%3D%22%232e7d32%22/%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2218%22%20r%3D%2214%22%20fill%3D%22%2343a047%22/%3E%3C/svg%3E">
+<title>broco Nihongo 운영 콘솔</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Zen+Maru+Gothic:wght@700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: sticky console bar (brand · data source · tabs) over one 1180px work column; panels in auto-fit grids that stack at phone width */
+:root{
+  --bg:#eef4ec; --surface:#ffffff; --ink:#1b2a1e; --muted:#5a6d5e; --line:#d2e0d0; --soft:#f5f9f4;
+  --accent:#2e7d32; --accent-soft:#dcefd8; --good:#11796b; --good-soft:#d5f0ea; --bad:#b2414f; --bad-soft:#f8e1e4;
+  --sun:#9a5b00; --sun-soft:#fbedd2; --plum:#7a3e8e; --plum-soft:#f1e3f6; --top:#a3324a; --top-soft:#f7e0e5; --shade:rgba(6,14,8,.5);
+  --f-ui:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --f-brand:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Noto Sans JP",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1611; --surface:#17231a; --ink:#e5efe6; --muted:#95a999; --line:#29392d; --soft:#122016;
+  --accent:#7ed389; --accent-soft:#1d3a23; --good:#5fd0bc; --good-soft:#12342e; --bad:#ff8f9c; --bad-soft:#43202a;
+  --sun:#e8b45c; --sun-soft:#3b2d15; --plum:#d9a6ec; --plum-soft:#3a2347; --top:#ff9db0; --top-soft:#45202a; --shade:rgba(0,0,0,.6); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1611; --surface:#17231a; --ink:#e5efe6; --muted:#95a999; --line:#29392d; --soft:#122016;
+  --accent:#7ed389; --accent-soft:#1d3a23; --good:#5fd0bc; --good-soft:#12342e; --bad:#ff8f9c; --bad-soft:#43202a;
+  --sun:#e8b45c; --sun-soft:#3b2d15; --plum:#d9a6ec; --plum-soft:#3a2347; --top:#ff9db0; --top-soft:#45202a; --shade:rgba(0,0,0,.6); color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14.5px;line-height:1.55}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+h2{margin:0;font-size:16px;text-wrap:balance}
+h3{margin:0;font-size:14.5px}
+
+/* console bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:6;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar-in,.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.bar-in{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;padding-block:12px 0}
+.brand{display:flex;align-items:baseline;gap:8px;margin-right:auto;min-width:0}
+.brand b{font-family:var(--f-brand);font-size:19px;white-space:nowrap}
+.brand b span{color:var(--accent)}
+.brand small{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.src{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;border-radius:999px;padding:4px 10px;background:var(--sun-soft);color:var(--sun)}
+.src.live{background:var(--good-soft);color:var(--good)}
+.src i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.me{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);min-width:0}
+.me span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+.btn{border:0;background:var(--accent);color:var(--bg);font-weight:700;padding:9px 14px;border-radius:10px;font-size:13.5px}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+.btn.danger{background:var(--bad);color:var(--bg)}
+.btn.sm{padding:6px 10px;font-size:12.5px;border-radius:9px}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.btn:disabled{opacity:.5;cursor:default}
+.tabs{display:flex;gap:2px;overflow-x:auto;width:100%;margin-top:4px;scrollbar-width:none}
+.tab{border:0;background:none;padding:10px 12px 11px;font-weight:700;font-size:14px;color:var(--muted);border-bottom:2.5px solid transparent;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.tab[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+.badge{font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;background:var(--line);color:var(--ink)}
+.badge.hot{background:var(--bad);color:var(--bg)}
+
+.wrap{padding-block:18px 56px;display:flex;flex-direction:column;gap:14px}
+.demo{display:flex;gap:10px;align-items:flex-start;background:var(--sun-soft);border-radius:12px;padding:10px 14px;font-size:13px}
+.demo b{color:var(--sun)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.ph{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ph p{margin:0;font-size:12.5px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:14px}
+.grid-side{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;align-items:start}
+@media (max-width:900px){.grid-side{grid-template-columns:minmax(0,1fr)}}
+
+/* KPI tiles */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi-l{font-size:12.5px;font-weight:700;color:var(--muted)}
+.kpi-v{font-family:var(--f-mono);font-size:30px;font-weight:500;line-height:1.15;font-variant-numeric:tabular-nums}
+.kpi-v small{font-size:16px;margin-left:2px;color:var(--muted)}
+.kpi-s{font-size:12.5px;color:var(--muted)}
+.kpi-d{margin:6px 0 0;padding-top:8px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--muted);line-height:1.5}
+.chip{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 9px}
+.chip.ok{background:var(--good-soft);color:var(--good)}
+.chip.warn{background:var(--sun-soft);color:var(--sun)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.mute{background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+
+/* charts */
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart .grid line{stroke:var(--line);stroke-width:1}
+.chart text{fill:var(--muted);font-size:11px;font-family:var(--f-ui)}
+.chart .val{fill:var(--ink);font-weight:700}
+.chart .bar{fill:var(--accent)}
+.chart .hit{fill:transparent}
+.chart .hit:hover+.bar,.chart g.on .bar{opacity:.8}
+.hbars{display:flex;flex-direction:column;gap:8px}
+.hb{display:grid;grid-template-columns:118px minmax(0,1fr) 68px;align-items:center;gap:10px;font-size:13px}
+.hb-l{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.hb-l small{font-size:11px;color:var(--muted)}
+.hb-t{height:14px;background:var(--soft);border-radius:4px;overflow:hidden}
+.hb-t i{display:block;height:100%;border-radius:0 4px 4px 0;background:var(--lc,var(--accent))}
+.hb-n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hb-n small{font-size:11px}
+.tip{position:fixed;z-index:40;pointer-events:none;background:var(--ink);color:var(--bg);border-radius:10px;padding:7px 10px;font-size:12px;line-height:1.45;max-width:240px;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+details.tv summary{font-size:12px;color:var(--muted);cursor:pointer}
+details.tv table{margin-top:6px}
+
+/* stage colors (same as the learner app) */
+[data-l="kana"]{--lc:var(--good);--ls:var(--good-soft)}
+[data-l="beg"]{--lc:var(--sun);--ls:var(--sun-soft)}
+[data-l="mid"]{--lc:var(--accent);--ls:var(--accent-soft)}
+[data-l="adv"]{--lc:var(--plum);--ls:var(--plum-soft)}
+[data-l="top"]{--lc:var(--top);--ls:var(--top-soft)}
+.stg{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 8px;background:var(--ls);color:var(--lc);white-space:nowrap}
+
+/* lists + tables */
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toolbar .grow{flex:1 1 200px;min-width:0}
+input[type=search],input[type=text],input[type=number],input[type=date],select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:14px;min-width:0}
+textarea{width:100%;min-height:76px;resize:vertical}
+.tw{overflow-x:auto;margin:0 -16px;padding:0 16px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{font-size:12px;font-weight:700;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+td.r,th.r{text-align:right}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--soft)}
+.who{display:flex;flex-direction:column;line-height:1.3}
+.who small{color:var(--muted);font-size:12px}
+.empty{padding:28px 10px;text-align:center;color:var(--muted)}
+.risk{display:flex;flex-direction:column}
+.risk button{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;text-align:left;border:0;background:none;border-bottom:1px solid var(--line);padding:10px 2px}
+.risk button:last-child{border-bottom:0}
+.risk .sub{grid-column:1/-1;font-size:12px;color:var(--muted)}
+
+/* Q&A */
+.seg{display:inline-flex;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:none;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:700;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.qlist{display:flex;flex-direction:column;gap:10px}
+.q{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.q.late{border-color:var(--bad)}
+.qh{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.qh b{color:var(--ink);font-size:13.5px}
+.qt{margin:0;font-size:15px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.ref{font-size:12.5px;background:var(--soft);border-radius:8px;padding:5px 9px;align-self:flex-start;color:var(--muted)}
+.st{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 8px}
+.st-wait{background:var(--soft);color:var(--ink);border:1px solid var(--line)}
+.st-assigned{background:var(--accent-soft);color:var(--accent)}
+.st-late{background:var(--bad);color:var(--bg)}
+.st-done{background:var(--good-soft);color:var(--good)}
+.st-cancel{background:var(--soft);color:var(--muted);text-decoration:line-through}
+.ans{background:var(--soft);border-radius:10px;padding:10px 12px;font-size:14px;display:flex;flex-direction:column;gap:4px;white-space:pre-wrap;word-break:break-word}
+.ans b{font-size:12.5px;color:var(--good)}
+.qa-act{display:flex;flex-direction:column;gap:8px;border-top:1px dashed var(--line);padding-top:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.err{color:var(--bad);font-size:12.5px;margin:0}
+.flag{font-size:12.5px;font-weight:700;color:var(--bad)}
+.tutor{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:8px 0;border-bottom:1px solid var(--line)}
+.tutor:last-child{border-bottom:0}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px}
+.dot.on{background:var(--good)}
+.rules{margin:0;padding-left:18px;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+
+/* notice editor */
+.form{display:flex;flex-direction:column;gap:12px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:12.5px;font-weight:700}
+.field small{font-size:11.5px;color:var(--muted)}
+.check{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px}
+.check input{width:18px;height:18px;accent-color:var(--accent)}
+.phone{background:var(--bg);border:1px solid var(--line);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:8px;max-width:380px}
+.phone .ph-h{font-family:var(--f-brand);font-size:18px}
+.phone .ph-h span{color:var(--accent)}
+.notice{display:flex;gap:8px;align-items:flex-start;background:var(--sun-soft);border-radius:12px;padding:9px 12px;font-size:13px}
+.notice svg{color:var(--sun);flex:none;margin-top:2px}
+.qab{display:flex;align-items:center;gap:10px;background:var(--accent-soft);border-radius:14px;padding:9px 12px}
+.qab .qi{width:30px;height:30px;border-radius:50%;background:var(--surface);color:var(--accent);display:grid;place-items:center;flex:none}
+.qab .qt2{flex:1;min-width:0;display:flex;flex-direction:column;font-size:12px;color:var(--muted)}
+.qab .qt2 b{font-size:13.5px;color:var(--ink)}
+.qab .go{flex:none;font-size:12px;font-weight:700;color:var(--surface);background:var(--accent);border-radius:999px;padding:6px 11px}
+
+/* drawer + dialogs */
+.dbg{position:fixed;inset:0;z-index:30;background:var(--shade);display:flex;justify-content:flex-end}
+.drawer{background:var(--surface);width:min(480px,100%);height:100%;overflow:auto;padding-block:calc(18px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-bottom,0px));padding-left:20px;padding-right:max(20px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px;box-shadow:-12px 0 40px rgba(0,0,0,.18)}
+.dhead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.x{border:0;background:none;color:var(--muted);font-size:18px;padding:6px 8px;margin:-6px -8px 0 0}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stat{background:var(--soft);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--f-mono);font-size:17px;font-variant-numeric:tabular-nums}
+.stat span{font-size:11.5px;color:var(--muted)}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 12px;font-size:13.5px;margin:0}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0}
+.box{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.mini{display:flex;align-items:flex-end;gap:3px;height:54px}
+.mini i{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px}
+.mini i.z{background:var(--line)}
+.mini-x{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+
+/* gate */
+.gate{min-height:70vh;display:grid;place-items:center;padding:24px 0}
+.gcard{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:26px 22px;width:min(380px,100%);display:flex;flex-direction:column;gap:12px;text-align:center}
+.spin{width:20px;height:20px;border-radius:50%;border:2.5px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite;margin:0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.spin{animation-duration:2.4s}}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:13.5px;z-index:50;max-width:calc(100% - 32px)}
+@media (max-width:560px){
+  .kpi-v{font-size:26px}
+  .hb{grid-template-columns:92px minmax(0,1fr) 62px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .me span{max-width:130px}
+}
+</style>
+<style>html,body{margin:0}</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="bar-in">
+    <div class="brand"><b>broco <span>Nihongo</span></b><small>운영 콘솔</small></div>
+    <a class="btn ghost sm applink" id="appLink" href="./">학습 앱 열기</a>
+    <span class="src" id="src"><i></i>데모 데이터</span>
+    <div class="me" id="me" hidden></div>
+    <button class="btn ghost sm" id="refresh">새로고침</button>
+    <nav class="tabs" id="tabs" aria-label="관리 메뉴"></nav>
+  </div>
+</header>
+<main class="wrap" id="main"></main>
+<div class="tip" id="tip" hidden></div>
+<div id="layer"></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="firebase-config.js"></script>
+<script>
+/* ---------- settings: firebase-config.js (shared with index.html) supplies these on GitHub ---------- */
+const CFG=Object.assign({apiKey:"",authDomain:"",projectId:"",storageBucket:"",messagingSenderId:"",appId:""},window.BROCCOLI_FIREBASE||{});
+const ADMINS=(window.BROCCOLI_ADMINS||[]).map(s=>String(s).trim().toLowerCase()).filter(Boolean);
+const LIVE=!!(CFG.apiKey&&CFG.projectId),FB_VER="10.12.2";
+
+/* ---------- shared rules with the learner app ---------- */
+const TIERS=["kana","beg","mid","adv","top"],TIER_START={kana:1,beg:5,mid:20,adv:100,top:200};
+const STAGE={kana:{name:"히라가나",range:"Lv.1–4"},beg:{name:"입문",range:"Lv.5–19"},mid:{name:"기초",range:"Lv.20–99"},adv:{name:"상급",range:"Lv.100–199"},top:{name:"최상급",range:"Lv.200+"}};
+const RANKS=[["아이언",1],["브론즈",5],["실버",11],["골드",21],["플래티넘",41],["다이아몬드",71],["마스터",100],["챌린저",200]];
+const xpFor=L=>Math.round(10*(L-1)+.5*(L-1)*(L-1));
+const lvOf=x=>{let L=1;while(xpFor(L+1)<=x)L++;return L};
+const tierOf=L=>L>=200?"top":L>=100?"adv":L>=20?"mid":L>=5?"beg":"kana";
+const rankOf=L=>{let r=RANKS[0][0];RANKS.forEach(([n,m])=>{if(L>=m)r=n});return r};
+const TUTORS=[{id:"T-01",name:"하윤 선배",tag:"N1 · 오사카 교환학생 1년",spec:["문법","뜻·뉘앙스"]},{id:"T-02",name:"민재 선배",tag:"N1 · 도쿄 거주",spec:["애니·J-POP 표현","뜻·뉘앙스"]},{id:"T-03",name:"사토 씨",tag:"일본인 교환학생",spec:["읽기·발음","기타"]}];
+const QTYPES=["읽기·발음","뜻·뉘앙스","문법","애니·J-POP 표현","기타"];
+const SLA=2*3600e3,HOURS=[9,24],DAY=864e5,TRACK={talk:"회화",jlpt:"JLPT"};
+const DEF_CFG={banner:{on:true,title:"",cta:""},notice:{on:false,text:"",until:""}};
+const DEF_TITLE="막히는 것이 있으면 선배에게 질문해 보세요!",DEF_CTA="질문하기";
+
+/* ---------- helpers ---------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const dstr=d=>d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();
+const parseD=s=>{const p=String(s).split("-").map(Number);return p.length===3&&p.every(n=>n>0)?new Date(p[0],p[1]-1,p[2]).getTime():null};
+const day0=t=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime()};
+const md=t=>{const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()}`};
+const hm=t=>{const d=new Date(t);return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
+const when=t=>t?(day0(t)===day0(Date.now())?`오늘 ${hm(t)}`:`${md(t)} ${hm(t)}`):"–";
+const dur=ms=>{const m=Math.max(1,Math.round(ms/6e4));return m<60?`${m}분`:m<1440?`${Math.floor(m/60)}시간 ${m%60?m%60+"분":""}`.trim():`${Math.round(m/1440)}일`};
+const ago=t=>{if(!t)return "기록 없음";const d=Math.round((day0(Date.now())-day0(t))/DAY);return d<=0?"오늘":d===1?"어제":`${d}일 전`};
+const pct=(a,b)=>b?Math.round(a/b*100):null;
+const dayTot=v=>v?(v.c||0)+(v.q||0)+(v.w||0):0;
+const isOpen=q=>q.status==="wait"||q.status==="assigned";
+const isLate=q=>isOpen(q)&&Date.now()-q.created>SLA;
+const tutorOf=id=>TUTORS.find(t=>t.id===id);
+const opNow=()=>{const h=new Date().getHours();return h>=HOURS[0]&&h<HOURS[1]};
+let toastT;function toast(m){const t=$("toast");t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2800)}
+const OK='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>';
+const WARN='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 7v6M12 17v.5"/></svg>';
+const MEGA='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h3l6 4V6L7 10z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg>';
+const ASK='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M9.5 10a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.5M12 16.5v.01"/></svg>';
+
+/* ---------- state ---------- */
+const S={mode:LIVE?"live":"demo",fb:null,me:null,gate:LIVE?"loading":null,gateMsg:"",users:[],rows:[],qs:[],cfg:JSON.parse(JSON.stringify(DEF_CFG)),cfgAt:0,
+  tab:"dashboard",qf:"open",uq:"",us:"all",uo:"recent",drafts:{},pick:{},cancelAsk:null,refreshedAt:0,err:"",pending:false,openUser:null};
+const TABS=[["dashboard","대시보드"],["learners","학습자"],["qa","선배 Q&A"],["notice","공지·배너"]];
+
+/* ---------- learner summary: the same numbers for demo and live data ---------- */
+function summarize(id,d){
+  const J=k=>{const v=d.data&&d.data[k];if(v==null)return null;try{return JSON.parse(v)}catch(e){return null}};
+  const xp=typeof d.xp==="number"?d.xp:(+J("xp")||0),L=lvOf(xp),log=J("log")||{},goal=+J("goal")||20,t0=day0(Date.now());
+  const days=Object.entries(log).map(([k,v])=>({t:parseD(k),v})).filter(x=>x.t&&dayTot(x.v)>0).sort((a,b)=>a.t-b.t);
+  const w7=days.filter(x=>x.t>t0-7*DAY),sum=(a,f)=>a.reduce((s,x)=>s+f(x),0);
+  const st=J("streak"),stLast=st&&parseD(st.last),wr=J("wrong");
+  return {id,raw:d,name:d.name||(d.email||"").split("@")[0]||"이름 없음",email:d.email||"",xp,L,rank:rankOf(L),tier:tierOf(L),goal,
+    days,first:days.length?days[0].t:null,last:days.length?days[days.length-1].t:null,updatedAt:d.updatedAt||0,
+    w7days:w7.length,w7n:sum(w7,x=>dayTot(x.v)),w7q:sum(w7,x=>x.v.q||0),w7qc:sum(w7,x=>x.v.qc||0),w7s:sum(w7,x=>x.v.s||0),w7goal:w7.filter(x=>dayTot(x.v)>=goal).length,
+    allc:sum(days,x=>x.v.c||0),allq:sum(days,x=>x.v.q||0),allqc:sum(days,x=>x.v.qc||0),alls:sum(days,x=>x.v.s||0),
+    streak:st&&stLast&&t0-stLast<=DAY?st.n||0:0,diag:J("diag"),track:J("track")||"talk",target:J("target"),
+    wrongN:wr?Object.keys(wr.q||{}).length+Object.keys(wr.c||{}).length:0,reset:d.data&&d.data._reset!=null,adminEdit:d.adminEdit||null};
+}
+function rebuild(){S.rows=S.users.map(u=>summarize(u.id,u.d));S.refreshedAt=Date.now()}
+function qCount(uid){return S.qs.filter(q=>q.uid===uid).length}
+
+/* ---------- KPIs (definitions double as the report's 성과지표) ---------- */
+function kpis(){
+  const R=S.rows,N=R.length,t0=day0(Date.now());
+  const wau=R.filter(r=>r.w7days>0).length;
+  const elig=R.filter(r=>r.first&&r.first<=t0-7*DAY),ret=elig.filter(r=>r.days.some(x=>x.t>r.first&&x.t<=r.first+7*DAY)).length;
+  const q=R.reduce((s,r)=>s+r.w7q,0),qc=R.reduce((s,r)=>s+r.w7qc,0);
+  const ad=R.reduce((s,r)=>s+r.w7days,0),ag=R.reduce((s,r)=>s+r.w7goal,0);
+  const done=S.qs.filter(x=>x.status==="done"&&x.answeredAt&&x.answeredAt>Date.now()-30*DAY),fast=done.filter(x=>x.answeredAt-x.created<=SLA).length;
+  const rated=done.filter(x=>x.rating),good=rated.filter(x=>x.rating==="good").length,avg=done.length?done.reduce((s,x)=>s+(x.answeredAt-x.created),0)/done.length:0;
+  return [
+    {k:"wau",l:"주간 활성 학습자",v:pct(wau,N),u:"%",s:`${wau} / ${N}명이 최근 7일에 공부했어요`,goal:60,d:"최근 7일 안에 카드·퀴즈·쓰기를 1개 이상 한 학습자 ÷ 전체 학습자. 목표 60% (매일 쓰는 습관형 서비스 기준)"},
+    {k:"ret",l:"7일 재방문율",v:pct(ret,elig.length),u:"%",s:elig.length?`첫 학습 후 7일 안에 다시 온 사람 ${ret} / ${elig.length}명`:"첫 학습 후 7일이 지난 학습자가 아직 없어요",goal:40,d:"첫 학습일이 7일 넘게 지난 학습자 중, 첫날 다음 7일 안에 다시 공부한 비율. 목표 40%"},
+    {k:"acc",l:"퀴즈 정답률",v:pct(qc,q),u:"%",s:`최근 7일 ${qc.toLocaleString()} / ${q.toLocaleString()}문제`,band:[70,85],d:"최근 7일 맞힌 퀴즈 ÷ 푼 퀴즈. 70~85%면 레벨 난이도가 알맞다고 봐요. 낮으면 어렵고, 높으면 쉬워요"},
+    {k:"goal",l:"하루 목표 달성률",v:pct(ag,ad),u:"%",s:`최근 7일 공부한 ${ad}일 중 ${ag}일 달성`,goal:50,d:"최근 7일 동안 공부한 날 중 하루 목표(기본 20개)를 채운 날의 비율. 목표 50%"},
+    {k:"sla",l:"2시간 내 답변율",v:pct(fast,done.length),u:"%",s:done.length?`평균 ${dur(avg)} · 해결률 ${rated.length?pct(good,rated.length)+"%":"–"}`:"최근 30일 답변한 질문이 없어요",goal:90,d:"최근 30일 답변 완료 질문 중 접수부터 답변까지 2시간 이내인 비율. 목표 90%. 해결률은 ‘도움 됐어요’ ÷ 평가한 답변"}
+  ];
+}
+function kpiChip(k){
+  if(k.v==null)return `<span class="chip mute">대상 없음</span>`;
+  if(k.band){const [a,b]=k.band;return k.v<a?`<span class="chip warn">${WARN} 어려움 · 기준 ${a}~${b}%</span>`:k.v>b?`<span class="chip warn">${WARN} 쉬움 · 기준 ${a}~${b}%</span>`:`<span class="chip ok">${OK} 알맞음 · 기준 ${a}~${b}%</span>`}
+  return k.v>=k.goal?`<span class="chip ok">${OK} 목표 ${k.goal}% 달성</span>`:`<span class="chip bad">${WARN} 목표 ${k.goal}% 미달</span>`;
+}
+
+/* ---------- charts ---------- */
+function dailySeries(n){
+  const t0=day0(Date.now()),out=[];
+  for(let i=n-1;i>=0;i--){const t=t0-i*DAY,k=dstr(new Date(t));let a=0,c=0,q=0;
+    S.rows.forEach(r=>{const v=(r.days.find(x=>x.t===t)||{}).v;if(v&&dayTot(v)>0){a++;c+=v.c||0;q+=v.q||0}});out.push({t,a,c,q})}
+  return out;
+}
+function niceMax(m){if(m<=4)return 4;const p=Math.pow(10,Math.floor(Math.log10(m))),s=[1,2,2.5,5,10].map(x=>x*p).find(x=>m/x<=4)||10*p;return Math.ceil(m/s)*s}
+function barChart(data,W){
+  W=Math.max(300,Math.min(680,Math.round(W||600)));const H=W<420?200:190,ml=30,mr=6,mt=16,mb=24,iw=W-ml-mr,ih=H-mt-mb,max=niceMax(Math.max(1,...data.map(d=>d.a))),bw=iw/data.length,w=Math.min(26,bw*.62);
+  const y=v=>mt+ih-v/max*ih,ticks=[0,max/4,max/2,max*3/4,max].filter(v=>Number.isInteger(v));
+  const bar=(x,v)=>{const h=Math.max(v?2:0,ih-(y(v)-mt)),top=mt+ih-h,r=Math.min(4,w/2,h);return h?`<path class="bar" d="M${x},${mt+ih}V${top+r}Q${x},${top} ${x+r},${top}H${x+w-r}Q${x+w},${top} ${x+w},${top+r}V${mt+ih}Z"/>`:""};
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="최근 ${data.length}일 일별 학습자 수">
+    <g class="grid">${ticks.map(v=>`<line x1="${ml}" x2="${W-mr}" y1="${y(v)}" y2="${y(v)}"/><text x="${ml-6}" y="${y(v)+4}" text-anchor="end">${v}</text>`).join("")}</g>
+    ${data.map((d,i)=>{const x=ml+i*bw+(bw-w)/2;return `<g data-i="${i}"><rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih+mb}"/>${bar(x,d.a)}${i===data.length-1?`<text class="val" x="${x+w/2}" y="${y(d.a)-5}" text-anchor="middle">${d.a}</text>`:""}${i%2===(data.length-1)%2?`<text x="${x+w/2}" y="${H-6}" text-anchor="middle">${md(d.t)}</text>`:""}</g>`}).join("")}
+  </svg>`;
+}
+function bindTips(root,fn){
+  const tip=$("tip");
+  root.onmousemove=root.onclick=e=>{const g=e.target.closest("[data-i]");if(!g||!root.contains(g)){tip.hidden=true;return}
+    tip.innerHTML=fn(+g.dataset.i);tip.hidden=false;const r=tip.getBoundingClientRect();
+    tip.style.left=Math.min(innerWidth-r.width-8,Math.max(8,e.clientX-r.width/2))+"px";tip.style.top=Math.max(8,e.clientY-r.height-14)+"px"};
+  root.onmouseleave=()=>{tip.hidden=true};
+}
+function hbars(items,total){
+  const max=Math.max(1,...items.map(x=>x.n));
+  return `<div class="hbars">${items.map((x,i)=>`<div class="hb" data-i="${i}"${x.l?` data-l="${x.l}"`:""}><span class="hb-l"><b>${esc(x.name)}</b>${x.sub?`<small>${esc(x.sub)}</small>`:""}</span><span class="hb-t"><i style="width:${x.n/max*100}%"></i></span><span class="hb-n">${x.n}${total?`<small class="muted"> ${pct(x.n,total)}%</small>`:""}</span></div>`).join("")}</div>`;
+}
+
+/* ---------- shell ---------- */
+function renderBar(){
+  const src=$("src");src.className="src"+(S.mode==="live"?" live":"");src.innerHTML=`<i></i>${S.mode==="live"?"실시간 · Firebase":"데모 데이터"}`;
+  const me=$("me");me.hidden=!S.me;if(S.me)me.innerHTML=`<span title="${esc(S.me.email)}">${esc(S.me.email)}</span><button class="btn ghost sm" id="logout">로그아웃</button>`;
+  if($("logout"))$("logout").onclick=logout;
+  $("refresh").hidden=S.mode==="live"&&!S.me;
+  const open=S.qs.filter(isOpen).length,late=S.qs.filter(isLate).length;
+  $("tabs").hidden=!!S.gate;
+  $("tabs").innerHTML=TABS.map(([k,n])=>`<button class="tab" data-t="${k}"${S.tab===k?' aria-current="page"':""}>${n}${k==="learners"?` <span class="badge">${S.rows.length}</span>`:k==="qa"&&open?` <span class="badge${late?" hot":""}">${open}</span>`:""}</button>`).join("");
+}
+function render(){
+  renderBar();const m=$("main");
+  if(S.gate){m.innerHTML=gateHTML();bindGate();return}
+  const demo=S.mode==="demo"?`<div class="demo"><span><b>데모 데이터예요.</b> 학습자 24명과 질문 14개는 시연용으로 만든 가짜 기록이에요. firebase-config.js를 채워 GitHub에 올리면 실제 학습자 기록과 질문이 보여요. 여기서 바꾼 내용은 새로 고치면 처음 상태로 돌아가요.</span></div>`:"";
+  const err=S.err?`<div class="demo" style="background:var(--bad-soft)"><span><b style="color:var(--bad)">불러오지 못한 데이터가 있어요.</b> ${esc(S.err)}</span></div>`:"";
+  m.innerHTML=demo+err+({dashboard:dashHTML,learners:learnersHTML,qa:qaHTML,notice:noticeHTML}[S.tab])();
+  ({dashboard:bindDash,learners:bindLearners,qa:bindQA,notice:bindNotice}[S.tab])();
+}
+function go(t){if(!TABS.some(x=>x[0]===t))t="dashboard";S.tab=t;try{if(location.hash.slice(1)!==t)history.replaceState(null,"","#"+t)}catch(e){}$("tip").hidden=true;render();window.scrollTo(0,0)}
+$("tabs").onclick=e=>{const b=e.target.closest("[data-t]");if(b)go(b.dataset.t)};
+addEventListener("hashchange",()=>{const t=location.hash.slice(1);if(t&&t!==S.tab)go(t)});
+$("refresh").onclick=()=>{if(S.mode==="demo"){rebuild();render();toast("다시 계산했어요.")}else loadLive(true)};
+
+/* ---------- dashboard ---------- */
+function dashHTML(){
+  const K=kpis(),daily=dailySeries(14),R=S.rows,t0=day0(Date.now());
+  const stages=TIERS.map(t=>({name:STAGE[t].name,sub:STAGE[t].range,n:R.filter(r=>r.tier===t).length,l:t}));
+  const open=S.qs.filter(isOpen),late=open.filter(isLate),today=S.qs.filter(q=>q.status==="done"&&q.answeredAt>=t0);
+  const types=QTYPES.map(t=>({name:t,n:S.qs.filter(q=>q.type===t&&q.status!=="cancel").length})).filter(x=>x.n).sort((a,b)=>b.n-a.n);
+  const risk=R.map(r=>{const gap=r.last?Math.round((t0-day0(r.last))/DAY):null,acc=pct(r.w7qc,r.w7q);
+      return gap!=null&&gap>=3&&gap<=21?{r,why:`${gap}일째 학습 없음`,cls:"bad",sub:`연속 학습이 끊겼어요 · 마지막 ${md(r.last)} · ${STAGE[r.tier].name} Lv.${r.L}`,score:gap}
+        :acc!=null&&r.w7q>=10&&acc<55?{r,why:`정답률 ${acc}%`,cls:"warn",sub:`최근 7일 ${r.w7q}문제 · 레벨이 너무 높을 수 있어요 · ${STAGE[r.tier].name} Lv.${r.L}`,score:30-acc/10}:null}).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,6);
+  return `<section class="kpis" aria-label="성과지표">${K.map(k=>`<div class="kpi"><span class="kpi-l">${k.l}</span><b class="kpi-v">${k.v==null?"–":k.v}${k.v==null?"":`<small>${k.u}</small>`}</b><span class="kpi-s">${k.s}</span>${kpiChip(k)}<p class="kpi-d">${k.d}</p></div>`).join("")}</section>
+  <div class="grid2">
+    <section class="panel"><div class="ph"><h2>최근 14일 학습자 수</h2><p>막대를 누르면 그날 학습량이 보여요</p></div><div class="chart" id="cDaily">${barChart(daily)}</div>
+      <details class="tv"><summary>표로 보기</summary><div class="tw"><table><thead><tr><th>날짜</th><th class="r">학습자</th><th class="r">카드</th><th class="r">퀴즈</th></tr></thead><tbody>${daily.slice().reverse().map(d=>`<tr><td>${md(d.t)}</td><td class="r num">${d.a}</td><td class="r num">${d.c}</td><td class="r num">${d.q}</td></tr>`).join("")}</tbody></table></div></details></section>
+    <section class="panel"><div class="ph"><h2>단계별 학습자</h2><p>지금 레벨 기준 · 전체 ${R.length}명</p></div><div id="cStage">${hbars(stages,R.length)}</div></section>
+  </div>
+  <div class="grid2">
+    <section class="panel"><div class="ph"><h2>선배 Q&amp;A</h2><button class="btn ghost sm" data-go="qa">질문 처리하러 가기</button></div>
+      <div class="stats"><div class="stat"><b>${open.length}</b><span>처리할 질문</span></div><div class="stat"><b style="color:${late.length?"var(--bad)":"inherit"}">${late.length}</b><span>2시간 넘게 대기</span></div><div class="stat"><b>${today.length}</b><span>오늘 답변</span></div></div>
+      <h3>유형별 질문</h3>${types.length?hbars(types):`<p class="muted" style="margin:0">아직 질문이 없어요.</p>`}</section>
+    <section class="panel"><div class="ph"><h2>먼저 챙길 학습자</h2><p>3일 이상 쉬었거나 정답률이 55% 아래인 학습자</p></div>
+      ${risk.length?`<div class="risk">${risk.map(x=>`<button data-u="${esc(x.r.id)}"><span class="who"><b>${esc(x.r.name)}</b><small>${esc(x.r.email)}</small></span><span class="chip ${x.cls}">${WARN} ${x.why}</span><span class="sub">${x.sub}</span></button>`).join("")}</div>`:`<p class="empty">지금은 챙길 학습자가 없어요.</p>`}</section>
+  </div>`;
+}
+function bindDash(){
+  const daily=dailySeries(14),cd=$("cDaily");cd.innerHTML=barChart(daily,cd.clientWidth);bindTips(cd,i=>{const d=daily[i];return `<b>${md(d.t)}</b><br>학습자 ${d.a}명 · 카드 ${d.c} · 퀴즈 ${d.q}`});
+  const R=S.rows;bindTips($("cStage"),i=>{const t=TIERS[i],n=R.filter(r=>r.tier===t).length;return `<b>${STAGE[t].name}</b> ${STAGE[t].range}<br>${n}명 · 전체의 ${pct(n,R.length)??0}%`});
+  $("main").querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
+  $("main").querySelectorAll("[data-u]").forEach(b=>b.onclick=()=>openUser(b.dataset.u));
+}
+
+let rsT;addEventListener("resize",()=>{clearTimeout(rsT);rsT=setTimeout(()=>{const cd=$("cDaily");if(cd&&S.tab==="dashboard")cd.innerHTML=barChart(dailySeries(14),cd.clientWidth)},150)});
+
+/* ---------- learners ---------- */
+function filteredRows(){
+  const q=S.uq.trim().toLowerCase();
+  let R=S.rows.filter(r=>(S.us==="all"||r.tier===S.us)&&(!q||r.name.toLowerCase().includes(q)||r.email.toLowerCase().includes(q)));
+  const by={recent:(a,b)=>(b.last||0)-(a.last||0),level:(a,b)=>b.xp-a.xp,week:(a,b)=>b.w7n-a.w7n,name:(a,b)=>a.name.localeCompare(b.name,"ko")}[S.uo];
+  return R.sort(by);
+}
+function learnersHTML(){
+  const R=filteredRows();
+  return `<section class="panel"><div class="toolbar">
+      <input type="search" id="uq" class="grow" placeholder="이름이나 이메일로 찾기" value="${esc(S.uq)}" aria-label="학습자 검색">
+      <select id="us" aria-label="단계"><option value="all">모든 단계</option>${TIERS.map(t=>`<option value="${t}"${S.us===t?" selected":""}>${STAGE[t].name}</option>`).join("")}</select>
+      <select id="uo" aria-label="정렬">${[["recent","최근 학습순"],["level","레벨 높은순"],["week","7일 학습량순"],["name","이름순"]].map(([k,n])=>`<option value="${k}"${S.uo===k?" selected":""}>${n}</option>`).join("")}</select>
+      <button class="btn ghost sm" id="csv">CSV 내보내기</button></div>
+    <div class="tw"><table><thead><tr><th>학습자</th><th>레벨 · 티어</th><th>단계</th><th>최근 학습</th><th class="r">연속</th><th class="r">7일 학습량</th><th class="r">7일 정답률</th><th class="r">오답 노트</th><th class="r">질문</th></tr></thead>
+    <tbody>${R.map(r=>{const acc=pct(r.w7qc,r.w7q);return `<tr data-u="${esc(r.id)}" tabindex="0"><td><span class="who"><b>${esc(r.name)}</b><small>${esc(r.email)}</small></span></td><td><span class="num">Lv.${r.L}</span> <span class="muted">· ${r.rank}</span></td><td><span class="stg" data-l="${r.tier}">${STAGE[r.tier].name}</span></td><td>${ago(r.last)}</td><td class="r num">${r.streak?r.streak+"일":"–"}</td><td class="r num">${r.w7n}</td><td class="r num"${acc!=null&&acc<55?' style="color:var(--bad)"':""}>${acc==null?"–":acc+"%"}</td><td class="r num">${r.wrongN}</td><td class="r num">${qCount(r.id)||"–"}</td></tr>`}).join("")}</tbody></table>
+    ${R.length?"":`<p class="empty">조건에 맞는 학습자가 없어요.</p>`}</div>
+    <p class="muted" style="margin:0;font-size:12px">${R.length}명 표시 · 행을 누르면 자세한 기록과 레벨 조정·초기화 메뉴가 열려요.</p></section>`;
+}
+function bindLearners(){
+  $("uq").oninput=e=>{S.uq=e.target.value;const p=e.target.selectionStart;render();const i=$("uq");i.focus();try{i.setSelectionRange(p,p)}catch(x){}};
+  $("us").onchange=e=>{S.us=e.target.value;render()};$("uo").onchange=e=>{S.uo=e.target.value;render()};$("csv").onclick=openCSV;
+  $("main").querySelectorAll("tr[data-u]").forEach(tr=>{tr.onclick=()=>openUser(tr.dataset.u);tr.onkeydown=e=>{if(e.key==="Enter")openUser(tr.dataset.u)}});
+}
+function openUser(id){S.openUser=id;S.confirm=null;drawUser()}
+function closeLayer(){$("layer").innerHTML="";S.openUser=null;S.csvOpen=false}
+addEventListener("keydown",e=>{if(e.key==="Escape"&&$("layer").innerHTML)closeLayer()});
+function drawUser(){
+  const r=S.rows.find(x=>x.id===S.openUser);if(!r){closeLayer();return}
+  const t0=day0(Date.now()),last14=[...Array(14)].map((_,i)=>{const t=t0-(13-i)*DAY,v=(r.days.find(x=>x.t===t)||{}).v;return dayTot(v)}),mx=Math.max(1,...last14);
+  const acc=pct(r.allqc,r.allq),qs=S.qs.filter(q=>q.uid===r.id);
+  $("layer").innerHTML=`<div class="dbg" id="dbg"><aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="dT">
+    <div class="dhead"><div class="who"><b id="dT" style="font-size:18px">${esc(r.name)}</b><small>${esc(r.email)||"이메일 없음"}</small></div><button class="x" id="dX" aria-label="닫기">✕</button></div>
+    <div class="row"><span class="stg" data-l="${r.tier}">${STAGE[r.tier].name}</span><span class="chip mute num">Lv.${r.L} · ${r.rank}</span><span class="chip mute">${TRACK[r.track]||"회화"} 트랙${r.target?` · ${esc(r.target)} 목표`:""}</span>${r.reset?`<span class="chip warn">초기화됨</span>`:""}</div>
+    <div class="stats"><div class="stat"><b>${r.streak||0}일</b><span>연속 학습</span></div><div class="stat"><b>${r.w7n}</b><span>7일 학습량</span></div><div class="stat"><b>${acc==null?"–":acc+"%"}</b><span>누적 정답률</span></div></div>
+    <div class="box"><div class="ph"><h3>최근 14일</h3><span class="muted" style="font-size:12px">하루 목표 ${r.goal}개</span></div><div class="mini" aria-label="최근 14일 학습량">${last14.map(v=>`<i class="${v?"":"z"}" style="height:${v?Math.max(8,v/mx*100):4}%" title="${v}개"></i>`).join("")}</div><div class="mini-x"><span>${md(t0-13*DAY)}</span><span>오늘</span></div></div>
+    <dl class="kv"><dt>처음 공부한 날</dt><dd>${r.first?md(r.first):"–"}</dd><dt>최근 학습</dt><dd>${ago(r.last)}${r.last?` (${md(r.last)})`:""}</dd><dt>누적</dt><dd>카드 ${r.allc.toLocaleString()} · 퀴즈 ${r.allq.toLocaleString()} · ${Math.round(r.alls/60).toLocaleString()}분</dd>
+      <dt>배치 경기</dt><dd>${r.diag&&r.diag.L?`Lv.${r.diag.L} · ${STAGE[r.diag.rec]?STAGE[r.diag.rec].name:"–"} 단계로 시작`:"건너뜀"}</dd><dt>오답 노트</dt><dd>${r.wrongN}개</dd><dt>질문</dt><dd>${qs.length?`${qs.length}개 · 처리 중 ${qs.filter(isOpen).length}개`:"없음"}</dd><dt>계정 저장</dt><dd>${when(r.updatedAt)}</dd></dl>
+    ${r.adminEdit?`<p class="muted" style="margin:0;font-size:12px">${when(r.adminEdit.at)} ${esc(r.adminEdit.by||"관리자")}가 ${esc(r.adminEdit.what||"기록")}을(를) 바꿨어요.</p>`:""}
+    <div class="box"><h3>레벨 조정</h3><p class="muted" style="margin:0;font-size:12.5px">배치가 잘못됐거나 고객 테스트 시나리오를 맞출 때 써요. 학습자가 앱을 다시 열면 반영돼요. 학습자가 앱을 쓰는 중이면 그 기기 기록이 덮어쓸 수 있으니 쉬는 시간에 바꿔 주세요.</p>
+      <div class="row"><label for="dLv" class="muted" style="font-size:13px">새 레벨</label><input type="number" id="dLv" min="1" max="300" value="${r.L}" style="width:96px"><span class="muted" id="dLvHint" style="font-size:12.5px"></span><button class="btn sm" id="dLvGo">적용</button></div><p class="err" id="dErr" hidden></p></div>
+    <div class="box"><h3>기록 초기화</h3>${S.confirm==="reset"?`<p style="margin:0;font-size:13.5px">${esc(r.name)}님의 레벨, 오답 노트, 단어장, 연속 학습이 모두 지워지고 배치 경기부터 다시 시작해요. 되돌릴 수 없어요.</p><div class="row"><button class="btn ghost sm" id="dNo">취소</button><button class="btn danger sm" id="dYes">모두 지우기</button></div>`:`<div class="row" style="justify-content:space-between"><span class="muted" style="font-size:12.5px">테스트 참가자를 처음 상태로 돌릴 때 써요.</span><button class="btn ghost sm" id="dReset" style="color:var(--bad)">초기화…</button></div>`}</div>
+  </aside></div>`;
+  $("dbg").onclick=e=>{if(e.target.id==="dbg")closeLayer()};$("dX").onclick=closeLayer;
+  const hint=()=>{const L=+$("dLv").value;$("dLvHint").textContent=L>=1&&L<=300?`${STAGE[tierOf(L)].name} · ${rankOf(L)} · ${xpFor(L).toLocaleString()}XP`:""};$("dLv").oninput=hint;hint();
+  $("dLvGo").onclick=async()=>{const L=Math.round(+$("dLv").value);if(!(L>=1&&L<=300)){$("dErr").textContent="1부터 300 사이로 적어 주세요.";$("dErr").hidden=false;return}
+    if(L===r.L){$("dErr").textContent="지금 레벨과 같아요.";$("dErr").hidden=false;return}
+    await editUser(r,"level",L)};
+  if($("dReset"))$("dReset").onclick=()=>{S.confirm="reset";drawUser()};
+  if($("dNo"))$("dNo").onclick=()=>{S.confirm=null;drawUser()};
+  if($("dYes"))$("dYes").onclick=()=>editUser(r,"reset");
+  setTimeout(()=>{try{$("dX").focus()}catch(e){}},0);
+}
+async function editUser(r,kind,L){
+  const now=Date.now(),by=S.me?S.me.email:"데모 관리자",u=S.users.find(x=>x.id===r.id);if(!u)return;
+  let d;
+  if(kind==="level"){const x=xpFor(L);d=Object.assign({},u.d,{xp:x,lv:L,updatedAt:now,adminEdit:{at:now,by,what:`레벨(Lv.${r.L}→Lv.${L})`},data:Object.assign({},u.d.data,{xp:JSON.stringify(x)})})}
+  else d={v:1,updatedAt:now,xp:0,lv:1,name:u.d.name||"",email:u.d.email||"",adminEdit:{at:now,by,what:"전체 기록 초기화"},data:{_reset:JSON.stringify("admin")}};
+  try{
+    /* level: patch only the changed fields so progress the learner saved meanwhile survives; reset: replace everything */
+    if(S.mode==="live"){const {F,db}=S.fb,ref=F.doc(db,"users",r.id);
+      if(kind==="level")await F.setDoc(ref,{xp:d.xp,lv:d.lv,updatedAt:now,adminEdit:d.adminEdit,data:{xp:d.data.xp}},{merge:true});else await F.setDoc(ref,d)}
+    u.d=d;rebuild();S.confirm=null;drawUser();render();toast(kind==="level"?`${r.name}님을 Lv.${L}로 바꿨어요. 앱을 다시 열면 반영돼요.`:`${r.name}님의 기록을 초기화했어요.`);
+  }catch(e){const er=$("dErr");if(er){er.textContent=fsErr(e);er.hidden=false}else toast(fsErr(e))}
+}
+function csvText(){
+  const H=["이름","이메일","레벨","티어","단계","누적XP","처음 공부한 날","최근 학습일","연속 학습(일)","최근7일 학습량","최근7일 정답률(%)","누적 정답률(%)","오답 노트","트랙","목표 급수","질문 수"];
+  const q=v=>{const s=String(v??"");return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s};
+  const f=t=>t?new Date(t).toISOString().slice(0,10):"";
+  return "﻿"+[H].concat(filteredRows().map(r=>[r.name,r.email,r.L,r.rank,STAGE[r.tier].name,r.xp,f(r.first),f(r.last),r.streak,r.w7n,pct(r.w7qc,r.w7q)??"",pct(r.allqc,r.allq)??"",r.wrongN,TRACK[r.track]||"",r.target||"",qCount(r.id)])).map(row=>row.map(q).join(",")).join("\n");
+}
+function openCSV(){
+  const txt=csvText(),n=txt.split("\n").length-1;S.csvOpen=true;
+  $("layer").innerHTML=`<div class="dbg" id="dbg" style="justify-content:center;align-items:center;padding:16px"><div class="panel" role="dialog" aria-modal="true" aria-labelledby="cT" style="width:min(640px,100%);max-height:90%;overflow:auto">
+    <div class="dhead"><h2 id="cT">CSV 내보내기 · ${n}명</h2><button class="x" id="dX" aria-label="닫기">✕</button></div>
+    <p class="muted" style="margin:0;font-size:12.5px">지금 화면의 검색·단계 조건이 그대로 적용돼요. 엑셀이나 구글 시트에서 열 수 있어요. 미리보기 화면에서는 파일 저장이 막혀 있을 수 있으니 그럴 땐 복사해서 붙여 넣으세요.</p>
+    <textarea id="cTxt" readonly style="min-height:200px;font-family:var(--f-mono);font-size:12px">${esc(txt.slice(1))}</textarea>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost sm" id="cCopy">복사</button><button class="btn sm" id="cSave">파일로 저장</button></div></div></div>`;
+  $("dbg").onclick=e=>{if(e.target.id==="dbg")closeLayer()};$("dX").onclick=closeLayer;
+  $("cCopy").onclick=()=>{const t=$("cTxt");const sel=()=>{t.focus();t.select();toast("텍스트를 선택했어요. 복사해서 붙여 넣으세요.")};try{navigator.clipboard.writeText(txt.slice(1)).then(()=>toast("복사했어요."),sel)}catch(e){sel()}};
+  $("cSave").onclick=()=>{try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv;charset=utf-8"}));a.download=`broccoli-learners-${new Date().toISOString().slice(0,10)}.csv`;document.body.appendChild(a);a.click();a.remove();toast("CSV 파일을 저장했어요.")}catch(e){toast("파일로 저장하지 못했어요. 복사해서 붙여 넣어 주세요.")}};
+}
+
+/* ---------- Q&A ---------- */
+function stOf(q){return q.status==="done"?["st-done","답변 완료"]:q.status==="cancel"?["st-cancel","취소"]:isLate(q)?["st-late","지연"]:q.status==="assigned"?["st-assigned","배정됨"]:["st-wait","접수"]}
+function qaHTML(){
+  const all=S.qs,open=all.filter(isOpen),late=open.filter(isLate),t0=day0(Date.now());
+  const f={open:q=>isOpen(q),done:q=>q.status==="done",cancel:q=>q.status==="cancel",all:()=>true}[S.qf];
+  const list=all.filter(f).sort(S.qf==="open"?(a,b)=>(isLate(b)-isLate(a))||(a.created-b.created):(a,b)=>b.created-a.created);
+  const load=id=>all.filter(q=>q.tutor===id&&isOpen(q)).length,on=opNow();
+  return `<div class="grid-side"><section class="qlist" id="qaList" aria-label="질문 목록">
+      <div class="toolbar"><div class="seg" id="qf">${[["open",`처리할 질문 ${open.length}`],["done","답변 완료"],["cancel","취소"],["all","전체"]].map(([k,n])=>`<button data-f="${k}" aria-pressed="${S.qf===k}">${n}</button>`).join("")}</div>${late.length?`<span class="flag">${WARN} 2시간 넘게 기다린 질문 ${late.length}개</span>`:""}</div>
+      ${list.length?list.map(qCard).join(""):`<div class="panel"><p class="empty">${S.qf==="open"?"처리할 질문이 없어요. 새 질문이 오면 여기에 바로 나타나요.":"해당하는 질문이 없어요."}</p></div>`}
+    </section>
+    <aside class="stack" style="display:flex;flex-direction:column;gap:14px">
+      <section class="panel"><div class="ph"><h2>선배 튜터</h2><span class="muted" style="font-size:12px"><span class="dot${on?" on":""}"></span>${on?"운영 중":"운영 시간 외"} · 09~24시</span></div>
+        <div>${TUTORS.map(t=>`<div class="tutor"><span><b>${t.name}</b><br><span class="muted" style="font-size:12px">${t.tag}</span></span><span class="muted" style="font-size:12px;text-align:right">${t.spec.join(" · ")}<br>맡은 질문 <b class="num" style="color:var(--ink)">${load(t.id)}</b></span></div>`).join("")}</div></section>
+      <section class="panel"><h2>처리 기준</h2><ul class="rules">
+        <li>접수 순서대로 배정하고, 질문 유형에 맞는 선배에게 먼저 보내요.</li>
+        <li>운영 시간(09~24시) 안에 2시간 넘게 답이 없으면 ‘지연’으로 표시돼요. 다른 선배에게 다시 배정해요.</li>
+        <li>학습자가 ‘다른 선배에게 넘기기’를 누르면 재배정 요청 표시가 떠요.</li>
+        <li>‘아직 헷갈려요’ 평가가 붙은 답변은 같은 선배가 추가 질문을 이어서 맡아요.</li>
+        <li>학습과 관계없거나 부적절한 질문은 사유를 골라 취소해요. 학습자에게 사유가 보여요.</li></ul></section>
+    </aside></div>`;
+}
+function qCard(q){
+  const [cls,label]=stOf(q),t=q.tutor&&tutorOf(q.tutor),open=isOpen(q),late=isLate(q),pick=S.pick[q.id]||q.tutor||suggest(q);
+  return `<article class="q${late?" late":""}" data-q="${esc(q.id)}">
+    <div class="qh"><span class="st ${cls}">${label}</span><b>${esc(q.name||"학습자")}</b><span class="stg" data-l="${q.level||"beg"}">${STAGE[q.level]?STAGE[q.level].name:"–"}${q.lv?` Lv.${q.lv}`:""}</span><span>${esc(q.type)}</span><span>${when(q.created)}</span>${open?`<span${late?' style="color:var(--bad);font-weight:700"':""}>${dur(Date.now()-q.created)} 기다리는 중</span>`:""}</div>
+    ${q.ref&&q.ref.label?`<span class="ref">첨부: ${esc(q.ref.label)}</span>`:""}
+    <p class="qt">${esc(q.text)}</p>
+    ${q.reassignReq&&open?`<span class="flag">${WARN} 학습자가 다른 선배에게 넘겨 달라고 요청했어요 (${when(q.reassignReq)})</span>`:""}
+    ${t&&q.status!=="cancel"?`<span class="muted" style="font-size:12.5px">담당: ${t.name}${q.reassigned?` · 재배정 ${q.reassigned}회`:""}${q.assignedAt?` · ${when(q.assignedAt)} 배정`:""}</span>`:""}
+    ${q.status==="done"?`<div class="ans"><b>${t?t.name:"튜터"}의 답변 · ${dur(q.answeredAt-q.created)} 만에 답함${q.answeredBy?` · ${esc(q.answeredBy)}`:""}</b>${esc(q.answer)}</div><span>${q.rating==="good"?`<span class="chip ok">${OK} 도움 됐어요</span>`:q.rating==="bad"?`<span class="chip warn">${WARN} 아직 헷갈려요</span>`:`<span class="chip mute">평가 전</span>`}</span>`:""}
+    ${q.status==="cancel"?`<span class="muted" style="font-size:12.5px">${q.cancelReason?`취소 사유: ${esc(q.cancelReason)}`:"학습자가 취소했어요."}</span>`:""}
+    ${open?`<div class="qa-act">
+      <div class="row"><label class="muted" for="tp-${esc(q.id)}" style="font-size:12.5px">담당 선배</label><select id="tp-${esc(q.id)}" data-pick>${TUTORS.map(x=>`<option value="${x.id}"${x.id===pick?" selected":""}>${x.name}${x.spec.includes(q.type)?" · 전문":""}</option>`).join("")}</select>${pick!==q.tutor?`<button class="btn ghost sm" data-act="assign">${q.tutor?"다시 배정":"배정"}</button>`:""}</div>
+      <textarea id="an-${esc(q.id)}" data-draft placeholder="${esc((tutorOf(pick)||TUTORS[0]).name)} 이름으로 답변이 보내져요. 10자 이상 적어 주세요.">${esc(S.drafts[q.id]||"")}</textarea>
+      <p class="err" id="er-${esc(q.id)}" hidden></p>
+      ${S.cancelAsk===q.id?`<div class="row"><select id="cr-${esc(q.id)}" aria-label="취소 사유"><option>중복 질문</option><option>학습과 관계없는 질문</option><option>부적절한 내용</option></select><button class="btn ghost sm" data-act="cancelNo">그만두기</button><button class="btn danger sm" data-act="cancelYes">이 사유로 취소</button></div>`
+        :`<div class="row" style="justify-content:space-between"><button class="btn ghost sm" data-act="cancel" style="color:var(--bad)">질문 취소…</button><button class="btn sm" data-act="answer">답변 보내기</button></div>`}
+    </div>`:""}
+  </article>`;
+}
+function suggest(q){const load=id=>S.qs.filter(x=>x.tutor===id&&isOpen(x)).length;return TUTORS.slice().sort((a,b)=>(b.spec.includes(q.type)-a.spec.includes(q.type))||(load(a.id)-load(b.id)))[0].id}
+function bindQA(){
+  $("qf").onclick=e=>{const b=e.target.closest("[data-f]");if(b){S.qf=b.dataset.f;render()}};
+  const L=$("qaList");
+  L.oninput=e=>{if(e.target.matches("[data-draft]"))S.drafts[e.target.closest("[data-q]").dataset.q]=e.target.value};
+  L.onchange=e=>{if(e.target.matches("[data-pick]")){S.pick[e.target.closest("[data-q]").dataset.q]=e.target.value;render()}};
+  L.addEventListener("focusout",()=>setTimeout(()=>{if(S.pending&&!L.contains(document.activeElement)){S.pending=false;render()}},0));
+  L.onclick=async e=>{const b=e.target.closest("[data-act]");if(!b)return;const id=b.closest("[data-q]").dataset.q,q=S.qs.find(x=>x.id===id);if(!q)return;
+    const a=b.dataset.act,er=$("er-"+id),pick=S.pick[id]||q.tutor||suggest(q),now=Date.now(),fail=m=>{er.textContent=m;er.hidden=false};
+    if(a==="assign"){await qPatch(q,{status:"assigned",tutor:pick,assignedAt:now,reassigned:(q.reassigned||0)+(q.tutor?1:0),reassignReq:null},`${tutorOf(pick).name}에게 배정했어요.`)}
+    if(a==="answer"){const v=(S.drafts[id]||"").trim();if(v.length<10)return fail("답변을 10자 이상 적어 주세요.");if(v.length>1000)return fail(`1000자 이내로 줄여 주세요. 지금 ${v.length}자예요.`);
+      if(await qPatch(q,{status:"done",tutor:pick,assignedAt:q.assignedAt||now,answer:v,answeredAt:now,answeredBy:S.me?S.me.email:"데모 관리자",reassignReq:null},"답변을 보냈어요. 학습자 질문함에 바로 보여요."))delete S.drafts[id]}
+    if(a==="cancel"){S.cancelAsk=id;render()}
+    if(a==="cancelNo"){S.cancelAsk=null;render()}
+    if(a==="cancelYes"){const why=$("cr-"+id).value;S.cancelAsk=null;await qPatch(q,{status:"cancel",cancelReason:why},"질문을 취소했어요.")}
+  };
+}
+async function qPatch(q,patch,msg){
+  try{if(S.mode==="live"){const {F,db}=S.fb;await F.updateDoc(F.doc(db,"questions",q.id),patch)}
+    Object.assign(q,patch);toast(msg);render();return true}
+  catch(e){const er=$("er-"+q.id);if(er){er.textContent=fsErr(e);er.hidden=false}else toast(fsErr(e));return false}
+}
+
+/* ---------- notice + banner ---------- */
+function noticeHTML(){
+  const c=S.cfg,B=c.banner,N=c.notice;
+  return `<div class="grid2"><section class="panel"><div class="ph"><h2>학습 앱 홈 화면 문구</h2><p>${S.cfgAt?`마지막 저장 ${when(S.cfgAt)}`:"아직 저장한 적 없어요"}</p></div>
+    <form class="form" id="nf">
+      <label class="check"><input type="checkbox" id="bOn"${B.on!==false?" checked":""}> 선배 질문 배너 보이기</label>
+      <div class="field"><label for="bTitle">배너 제목</label><input type="text" id="bTitle" maxlength="40" placeholder="${esc(DEF_TITLE)}" value="${esc(B.title||"")}"><small>비워 두면 기본 문구가 나가요. 40자까지.</small></div>
+      <div class="field"><label for="bCta">버튼 문구</label><input type="text" id="bCta" maxlength="8" placeholder="${DEF_CTA}" value="${esc(B.cta||"")}"><small>8자까지.</small></div>
+      <hr style="border:0;border-top:1px dashed var(--line);margin:4px 0">
+      <label class="check"><input type="checkbox" id="nOn"${N.on?" checked":""}> 공지 보이기</label>
+      <div class="field"><label for="nText">공지 내용</label><input type="text" id="nText" maxlength="80" placeholder="예: JLPT 시험 전 주말(12/5~6)에는 선배 Q&A를 새벽 1시까지 운영해요." value="${esc(N.text||"")}"><small>배너 위에 한 줄로 보여요. 80자까지.</small></div>
+      <div class="field"><label for="nUntil">공지 끝나는 날</label><input type="date" id="nUntil" value="${esc(N.until||"")}"><small>이 날까지 보이고 다음 날부터 자동으로 사라져요. 비워 두면 끌 때까지 보여요.</small></div>
+      <p class="err" id="nErr" hidden></p>
+      <div class="row" style="justify-content:flex-end"><button type="button" class="btn ghost sm" id="nReset">기본값으로</button><button type="submit" class="btn" id="nSave">저장하고 앱에 반영</button></div>
+    </form></section>
+    <section class="panel"><div class="ph"><h2>미리보기</h2><p>학습자 휴대폰 홈 화면 맨 위</p></div><div class="phone" id="pv"></div>
+      <p class="muted" style="margin:0;font-size:12.5px">학습자가 앱을 새로 열면 바뀐 문구가 보여요. 로그인하지 않은 학습자에게도 보여요.</p></section></div>`;
+}
+function formCfg(){return {banner:{on:$("bOn").checked,title:$("bTitle").value.trim(),cta:$("bCta").value.trim()},notice:{on:$("nOn").checked,text:$("nText").value.trim(),until:$("nUntil").value}}}
+function drawPreview(){
+  const c=formCfg(),today=new Date(),iso=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+  const nt=c.notice.on&&c.notice.text&&(!c.notice.until||iso<=c.notice.until);
+  $("pv").innerHTML=`<span class="ph-h">broco <span>Nihongo</span></span>
+    ${nt?`<div class="notice">${MEGA}<span>${esc(c.notice.text)}</span></div>`:c.notice.on&&c.notice.text?`<p class="muted" style="margin:0;font-size:12px">공지 끝나는 날이 지나서 숨겨져요.</p>`:""}
+    ${c.banner.on?`<div class="qab"><span class="qi">${ASK}</span><span class="qt2"><b>${esc(c.banner.title||DEF_TITLE)}</b><span><span class="dot${opNow()?" on":""}"></span>실시간 Q&amp;A · ${opNow()?"지금 선배 3명 답변 중":"운영 시간 09~24시"}</span></span><span class="go">${esc(c.banner.cta||DEF_CTA)}</span></div>`:`<p class="muted" style="margin:0;font-size:12px">배너가 꺼져 있어요.</p>`}
+    <div style="height:56px;border-radius:14px;background:var(--surface);border:1px solid var(--line)"></div>`;
+}
+function bindNotice(){
+  const f=$("nf");f.oninput=f.onchange=drawPreview;drawPreview();
+  $("nReset").onclick=()=>{S.cfg=JSON.parse(JSON.stringify(DEF_CFG));render();toast("기본값으로 되돌렸어요. 저장해야 앱에 반영돼요.")};
+  f.onsubmit=async e=>{e.preventDefault();const c=formCfg(),er=$("nErr");er.hidden=true;
+    if(c.notice.on&&!c.notice.text){er.textContent="공지 내용을 적거나 ‘공지 보이기’를 꺼 주세요.";er.hidden=false;return}
+    $("nSave").disabled=true;
+    try{c.updatedAt=Date.now();c.by=S.me?S.me.email:"데모 관리자";if(S.mode==="live"){const {F,db}=S.fb;await F.setDoc(F.doc(db,"config","app"),c)}
+      S.cfg=c;S.cfgAt=c.updatedAt;render();toast("저장했어요. 학습자가 앱을 새로 열면 보여요.")}
+    catch(x){$("nSave").disabled=false;er.textContent=fsErr(x);er.hidden=false}};
+}
+
+/* ---------- live data (Firebase) ---------- */
+const fsErr=e=>e&&e.code==="permission-denied"?"권한이 없어요. Firestore 보안 규칙의 관리자 이메일 목록에 이 계정이 있는지 확인해 주세요."
+  :e&&(e.code==="unavailable"||e.code==="deadline-exceeded")?"인터넷 연결이 불안정해요. 잠시 뒤 다시 시도해 주세요.":`저장하지 못했어요.${e&&e.code?` (${e.code})`:""}`;
+async function fbLoad(){
+  if(S.fb)return S.fb;const B=`https://www.gstatic.com/firebasejs/${FB_VER}/`;
+  const [A,U,F]=await Promise.all(["app","auth","firestore"].map(n=>import(B+`firebase-${n}.js`)));
+  const app=A.initializeApp(CFG),auth=U.getAuth(app);try{auth.languageCode="ko"}catch(e){}
+  return S.fb={U,F,auth,db:F.getFirestore(app)};
+}
+function gateHTML(){
+  const g=S.gate;
+  return `<div class="gate"><div class="gcard"><b style="font-family:var(--f-brand);font-size:20px">broco <span style="color:var(--accent)">Nihongo</span></b><span class="muted" style="font-size:13px;font-weight:700">운영 콘솔</span>
+    ${g==="loading"?`<div class="spin" aria-hidden="true"></div><p class="muted" style="margin:0">로그인 상태를 확인하는 중이에요…</p>`
+    :g==="login"?`<p style="margin:0">관리자로 등록된 Google 계정으로 로그인해 주세요.</p><button class="btn" id="gIn">Google 계정으로 로그인</button>`
+    :g==="denied"?`<p style="margin:0"><b>${esc(S.gateMsg)}</b> 계정은 관리자로 등록되지 않았어요.</p><p class="muted" style="margin:0;font-size:12.5px">firebase-config.js의 BROCCOLI_ADMINS와 Firestore 보안 규칙에 이 이메일을 넣은 뒤 다시 로그인해 주세요.</p><button class="btn ghost" id="gOut">다른 계정으로 로그인</button>`
+    :`<p class="err" style="font-size:14px">${esc(S.gateMsg)}</p><button class="btn ghost" id="gRetry">다시 시도</button>`}
+    ${g!=="loading"&&S.gateMsg&&g==="login"?`<p class="err">${esc(S.gateMsg)}</p>`:""}</div></div>`;
+}
+function bindGate(){
+  if($("gIn"))$("gIn").onclick=async()=>{const {U,auth}=S.fb,p=new U.GoogleAuthProvider();S.gateMsg="";
+    try{await U.signInWithPopup(auth,p)}catch(e){if(e&&e.code==="auth/popup-blocked"){try{await U.signInWithRedirect(auth,p);return}catch(x){e=x}}
+      S.gateMsg=e&&e.code==="auth/unauthorized-domain"?"이 주소가 Firebase 승인된 도메인에 없어요.":e&&e.code==="auth/popup-closed-by-user"?"로그인 창이 닫혔어요. 다시 시도해 주세요.":`로그인하지 못했어요.${e&&e.code?` (${e.code})`:""}`;render()}};
+  if($("gOut"))$("gOut").onclick=logout;
+  if($("gRetry"))$("gRetry").onclick=()=>{S.fb=null;S.gate="loading";render();startLive()};
+}
+async function logout(){try{S.unsubQ&&S.unsubQ();await S.fb.U.signOut(S.fb.auth)}catch(e){}S.me=null;S.users=[];S.rows=[];S.qs=[];S.gate="login";render()}
+async function startLive(){
+  render();
+  try{const {U,auth}=await fbLoad();
+    U.getRedirectResult(auth).catch(()=>{});
+    U.onAuthStateChanged(auth,u=>{
+      if(!u){S.me=null;S.gate="login";render();return}
+      const em=(u.email||"").toLowerCase();
+      if(!ADMINS.includes(em)){S.me=null;S.gate="denied";S.gateMsg=u.email||"이";render();return}
+      S.me=u;S.gate=null;S.gateMsg="";loadLive();
+    });
+  }catch(e){S.gate="error";S.gateMsg="Firebase를 불러오지 못했어요. 인터넷 연결과 firebase-config.js를 확인해 주세요.";render()}
+}
+async function loadLive(manual){
+  const {F,db}=S.fb;S.err="";
+  try{const snap=await F.getDocs(F.collection(db,"users"));S.users=snap.docs.map(d=>({id:d.id,d:d.data()}))}catch(e){S.err="학습자 기록: "+fsErr(e)}
+  try{const c=await F.getDoc(F.doc(db,"config","app"));if(c.exists()){const v=c.data();S.cfg={banner:Object.assign({},DEF_CFG.banner,v.banner||{}),notice:Object.assign({},DEF_CFG.notice,v.notice||{})};S.cfgAt=v.updatedAt||0}}catch(e){}
+  if(!S.unsubQ){
+    try{S.unsubQ=F.onSnapshot(F.query(F.collection(db,"questions"),F.orderBy("created","desc"),F.limit(300)),s=>{
+        const prev=new Set(S.qs.map(q=>q.id));S.qs=s.docs.map(d=>Object.assign({id:d.id},d.data()));
+        const fresh=S.qs.filter(q=>!prev.has(q.id)&&isOpen(q)).length;
+        if(S.refreshedAt&&fresh)toast(`새 질문 ${fresh}개가 들어왔어요.`);
+        const L=$("qaList");if(S.tab==="qa"&&L&&L.contains(document.activeElement)){S.pending=true;renderBar();return}
+        if(S.openUser||S.csvOpen){renderBar();return}
+        render()},e=>{S.err="질문: "+fsErr(e);S.unsubQ=null;render()})}catch(e){S.err="질문: "+fsErr(e)}
+  }
+  rebuild();render();if(manual)toast("최신 기록을 불러왔어요.");
+}
+
+/* ---------- demo data: 24 learners, 14 questions ---------- */
+function rng(seed){return ()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function genDemo(){
+  const R=rng(20261103),pick=a=>a[Math.floor(R()*a.length)],t0=day0(Date.now());
+  const names=["민지","서준","하은","도윤","지우","예준","수아","시우","서연","주원","채원","지호","다은","건우","윤서","현우","소율","유준","지민","은우","가은","선우","예린","태윤"];
+  const plan=[3,8,12,6,15,2,17,9,4,11, 24,35,52,28,67,41,88,33,73, 112,138,164, 181,214];
+  const users=names.map((nm,i)=>{
+    const id="demo-"+String(i+1).padStart(2,"0"),targetL=plan[i],fresh=targetL<5,churn=!fresh&&R()<.22,start=t0-Math.floor(fresh?R()*3:6+R()*34)*DAY,p=.25+R()*.6,acc=.52+R()*.4,stopGap=!churn&&R()<.25?Math.floor(3+R()*9):0;
+    const log={};let ax=0;
+    for(let t=start;t<=t0-stopGap*DAY;t+=DAY){if(churn&&t>start)break;if(t!==start&&R()>p)continue;const c=Math.floor(fresh?2+R()*7:2+R()*21),q=Math.floor(fresh?2+R()*6:2+R()*15),qc=Math.round(q*Math.min(.98,acc+(R()-.5)*.16)),w=R()<.3?Math.floor(R()*6):0;
+      log[dstr(new Date(t))]={c,q,qc,w,s:c*7+q*11+w*20};ax+=c+q+qc+w}
+    const base=Math.max(0,xpFor(targetL)-ax),xp=base+ax,L=lvOf(xp),startL=lvOf(base)||1;
+    let n=0;for(let t=day0(Date.now());;t-=DAY){const v=log[dstr(new Date(t))];if(v&&v.q){n++}else if(t===t0)continue;else break}
+    const lastQ=Object.keys(log).map(parseD).filter(Boolean).sort((a,b)=>b-a)[0];
+    const wq={},wc={};for(let k=0;k<Math.floor(R()*14);k++)wq["n5:"+k]=1+Math.floor(R()*3);for(let k=0;k<Math.floor(R()*20);k++)wc["av:"+k]=1;
+    const tier=tierOf(L),tg={kana:"N5",beg:"N5",mid:pick(["N4","N3"]),adv:"N2",top:"N1"}[tier];
+    const data={xp:JSON.stringify(xp),log:JSON.stringify(log),goal:JSON.stringify(pick([10,20,20,20,30])),onboarded:"true",track:JSON.stringify(pick(["talk","jlpt"])),target:JSON.stringify(tg),
+      streak:JSON.stringify({last:lastQ?dstr(new Date(lastQ)):"2000-1-1",n:Math.max(n,lastQ?1:0)}),diag:JSON.stringify(R()<.8?{rec:tierOf(startL),L:startL}:null),wrong:JSON.stringify({q:wq,c:wc})};
+    return {id,d:{v:1,updatedAt:(lastQ||start)+Math.floor(R()*12)*3600e3,xp,lv:L,name:nm,email:`learner${String(i+1).padStart(2,"0")}@example.com`,data}};
+  });
+  const U=k=>users[k],now=Date.now(),m=6e4,h=36e5;
+  const Q=(k,o)=>Object.assign({id:"dq-"+Math.random().toString(36).slice(2,8),uid:U(k).id,name:U(k).d.name,email:U(k).d.email,lv:U(k).d.lv,level:tierOf(U(k).d.lv),ref:null,status:"wait",tutor:null,assignedAt:null,answer:null,answeredAt:null,rating:null,reassigned:0,reassignReq:null},o);
+  const qs=[
+    Q(4,{type:"문법",text:"「〜ても」랑 「〜のに」 둘 다 ‘~인데도’로 번역되던데 어떻게 구분해요?",created:now-12*m}),
+    Q(1,{type:"읽기·발음",text:"「今日」를 きょう라고 읽는데 こんにち라고 읽는 경우도 있나요?",created:now-2.7*h,ref:{label:"Anki 단어 · 입문 · 今日"}}),
+    Q(11,{type:"애니·J-POP 표현",text:"애니에서 「やばい」를 좋을 때도 쓰던데 원래 나쁜 뜻 아니에요?",created:now-35*m,status:"assigned",tutor:"T-02",assignedAt:now-30*m}),
+    Q(7,{type:"뜻·뉘앙스",text:"「すみません」과 「ごめんなさい」는 언제 각각 써요? 편의점 점원한테는 뭐라고 해요?",created:now-2.25*h,status:"assigned",tutor:"T-01",assignedAt:now-2.1*h,reassignReq:now-8*m}),
+    Q(14,{type:"기타",text:"N3 시험까지 한 달 남았는데 단어랑 문법 중 뭘 먼저 하면 좋을까요?",created:now-50*m}),
+    Q(9,{type:"읽기·발음",text:"「生」 한자는 읽는 법이 너무 많은데 다 외워야 해요?",created:now-26*h,status:"done",tutor:"T-03",assignedAt:now-26*h+5*m,answer:"전부 한꺼번에 외울 필요는 없어요. 먼저 せい(学生), しょう(一生), い-きる(生きる), う-まれる(生まれる), なま(生ビール) 다섯 가지만 단어와 함께 익히세요. 나머지 읽기는 새 단어에서 만날 때 하나씩 붙이면 돼요.",answeredAt:now-25.4*h,rating:"good"}),
+    Q(2,{type:"뜻·뉘앙스",text:"「大丈夫です」가 거절하는 뜻이 될 때가 있나요?",created:now-30*h,status:"done",tutor:"T-01",assignedAt:now-30*h+3*m,answer:"네, 자주 있어요. 편의점에서 「袋はご利用ですか」(봉투 필요하세요?)라고 물을 때 「大丈夫です」라고 하면 ‘괜찮아요, 필요 없어요’라는 뜻이에요. 말끝을 부드럽게 올리고 가볍게 고개를 저으면 더 자연스러워요.",answeredAt:now-29.6*h,rating:"good"}),
+    Q(0,{type:"문법",text:"「は」와 「が」 차이를 쉽게 설명해 주세요.",created:now-3*DAY,status:"done",tutor:"T-01",assignedAt:now-3*DAY+10*m,answer:"は는 ‘이야기의 주제’를, が는 ‘누가/무엇이’라는 새 정보를 가리켜요. 「誰が来ましたか」처럼 모르는 것을 물을 때와 그 답 「田中さんが来ました」에는 が를 써요. 「私は学生です」처럼 이미 아는 대상을 두고 설명할 때는 は예요.",answeredAt:now-3*DAY+48*m,rating:"bad"}),
+    Q(13,{type:"애니·J-POP 표현",text:"「〜じゃん」은 어느 지역 말투예요?",created:now-4*DAY,status:"done",tutor:"T-02",assignedAt:now-4*DAY+2*m,answer:"원래 시즈오카·야마나시·가나가와 쪽 말투가 도쿄로 퍼진 것으로 알려져 있어요. 지금은 수도권 젊은 층이 흔히 쓰는 반말이라 친구 사이에서는 자연스럽지만, 윗사람에게는 쓰지 않아요.",answeredAt:now-4*DAY+27*m,rating:"good"}),
+    Q(16,{type:"문법",text:"「食べられる」가 가능형이랑 수동형이 모양이 같은데 어떻게 구분해요?",created:now-5*DAY,status:"done",tutor:"T-01",assignedAt:now-5*DAY+20*m,answer:"문맥과 조사로 구분해요. 「刺身が食べられる」(회를 먹을 수 있다)처럼 대상에 が/を가 붙고 ‘할 수 있다’면 가능형이에요. 「犬にパンを食べられた」(개가 빵을 먹어 버렸다)처럼 ‘누구에게’ に가 있으면 수동형이에요.",answeredAt:now-5*DAY+3.2*h,rating:null}),
+    Q(21,{type:"뜻·뉘앙스",text:"메일 끝에 「よろしくお願いいたします」 말고 다른 표현도 쓰나요?",created:now-6*DAY,status:"done",tutor:"T-01",assignedAt:now-6*DAY+4*m,answer:"상황에 따라 「引き続きよろしくお願いいたします」(계속 잘 부탁드립니다), 「ご確認のほど、よろしくお願いいたします」(확인 부탁드립니다), 더 격식을 차릴 땐 「何卒よろしくお願い申し上げます」를 써요.",answeredAt:now-6*DAY+38*m,rating:"good"}),
+    Q(6,{type:"읽기·발음",text:"장음 표기 「おう」와 「おお」를 구분하는 규칙이 있나요?",created:now-7*DAY,status:"done",tutor:"T-03",assignedAt:now-7*DAY+6*m,answer:"대부분의 ‘오-’ 장음은 おう로 써요(おとうさん, こうこう). おお로 쓰는 건 おおきい, とおい, おおい, こおり, とおる처럼 정해진 단어들이라 묶어서 외우면 돼요.",answeredAt:now-7*DAY+1.6*h,rating:null}),
+    Q(3,{type:"기타",text:"테스트로 보내 봐요",created:now-2*DAY,status:"cancel",cancelReason:"학습과 관계없는 질문"}),
+    Q(19,{type:"문법",text:"「〜ものの」랑 「〜けれども」는 바꿔 써도 되나요?",created:now-2*DAY,status:"done",tutor:"T-01",assignedAt:now-2*DAY+9*m,answer:"뜻은 비슷하지만 〜ものの가 더 딱딱한 글말이에요. 일상 대화에서는 けど·けれども를, 보고서나 뉴스 같은 글에서는 ものの를 쓰면 자연스러워요. 〜ものの 뒤에는 보통 기대와 다른 결과가 와요.",answeredAt:now-2*DAY+52*m,rating:"good"})
+  ];
+  return {users,qs};
+}
+
+/* ---------- start ---------- */
+const h0=location.hash.slice(1);if(TABS.some(x=>x[0]===h0))S.tab=h0;
+if(S.mode==="demo"){const D=genDemo();S.users=D.users;S.qs=D.qs;S.cfgAt=0;rebuild();render()}else startLive();
+setInterval(()=>{if(S.tab==="qa"&&!S.gate&&!$("layer").innerHTML){const L=$("qaList");if(L&&L.contains(document.activeElement))return;render()}},60000);
+</script>
+</body>
+</html>
