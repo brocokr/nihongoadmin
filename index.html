@@ -97,6 +97,8 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .chart .bar{fill:var(--accent)}
 .chart .hit{fill:transparent}
 .chart .hit:hover+.bar,.chart g.on .bar{opacity:.8}
+.vrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.vrow{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .hbars{display:flex;flex-direction:column;gap:8px}
 .hb{display:grid;grid-template-columns:118px minmax(0,1fr) 68px;align-items:center;gap:10px;font-size:13px}
 .hb-l{display:flex;flex-direction:column;line-height:1.25;min-width:0}
@@ -386,7 +388,17 @@ function dashHTML(){
   const risk=R.map(r=>{const gap=r.last?Math.round((t0-day0(r.last))/DAY):null,acc=pct(r.w7qc,r.w7q);
       return gap!=null&&gap>=3&&gap<=21?{r,why:`${gap}일째 학습 없음`,cls:"bad",sub:`연속 학습이 끊겼어요 · 마지막 ${md(r.last)} · ${STAGE[r.tier].name} Lv.${r.L}`,score:gap}
         :acc!=null&&r.w7q>=10&&acc<55?{r,why:`정답률 ${acc}%`,cls:"warn",sub:`최근 7일 ${r.w7q}문제 · 레벨이 너무 높을 수 있어요 · ${STAGE[r.tier].name} Lv.${r.L}`,score:30-acc/10}:null}).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,6);
-  return `<section class="kpis" aria-label="성과지표">${K.map(k=>`<div class="kpi"><span class="kpi-l">${k.l}</span><b class="kpi-v">${k.v==null?"–":k.v}${k.v==null?"":`<small>${k.u}</small>`}</b><span class="kpi-s">${k.s}</span>${kpiChip(k)}<p class="kpi-d">${k.d}</p></div>`).join("")}</section>
+  const VS=visitStats();
+  return `<section class="panel"><div class="ph"><h2>방문</h2><p>${S.mode==="live"?"학습 앱이 열릴 때마다 집계돼요 · 운영 콘솔 방문은 빼요":"데모 데이터 · 최근 30일"}</p></div>
+    <div class="vrow">
+      <div class="stat"><b>${VS.pv.toLocaleString()}</b><span>누적 조회수</span></div>
+      <div class="stat"><b>${VS.v.toLocaleString()}</b><span>누적 방문</span></div>
+      <div class="stat"><b>${VS.nu.toLocaleString()}</b><span>누적 방문자(기기)</span></div>
+      <div class="stat"><b>${VS.today.v.toLocaleString()}</b><span>오늘 방문 · 조회 ${VS.today.pv.toLocaleString()}</span></div>
+    </div>
+    <div class="chart" id="cVisit">${barChart(VS.days.map(x=>({t:x.t,a:x.v})))}</div>
+    <p class="muted" style="margin:0;font-size:12px">조회수는 앱을 열거나 새로고침할 때마다, 방문은 브라우저 창 하나에서 처음 열 때 한 번, 방문자는 기기마다 처음 한 번만 세요.</p></section>
+  <section class="kpis" aria-label="성과지표">${K.map(k=>`<div class="kpi"><span class="kpi-l">${k.l}</span><b class="kpi-v">${k.v==null?"–":k.v}${k.v==null?"":`<small>${k.u}</small>`}</b><span class="kpi-s">${k.s}</span>${kpiChip(k)}<p class="kpi-d">${k.d}</p></div>`).join("")}</section>
   <div class="grid2">
     <section class="panel"><div class="ph"><h2>최근 14일 학습자 수</h2><p>막대를 누르면 그날 학습량이 보여요</p></div><div class="chart" id="cDaily">${barChart(daily)}</div>
       <details class="tv"><summary>표로 보기</summary><div class="tw"><table><thead><tr><th>날짜</th><th class="r">학습자</th><th class="r">카드</th><th class="r">퀴즈</th></tr></thead><tbody>${daily.slice().reverse().map(d=>`<tr><td>${md(d.t)}</td><td class="r num">${d.a}</td><td class="r num">${d.c}</td><td class="r num">${d.q}</td></tr>`).join("")}</tbody></table></div></details></section>
@@ -400,7 +412,14 @@ function dashHTML(){
       ${risk.length?`<div class="risk">${risk.map(x=>`<button data-u="${esc(x.r.id)}"><span class="who"><b>${esc(x.r.name)}</b><small>${esc(x.r.email)}</small></span><span class="chip ${x.cls}">${WARN} ${x.why}</span><span class="sub">${x.sub}</span></button>`).join("")}</div>`:`<p class="empty">지금은 챙길 학습자가 없어요.</p>`}</section>
   </div>`;
 }
+function visitStats(){
+  const t0=day0(Date.now()),key=t=>{const d=new Date(t);return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`},by={};
+  S.visits.forEach(x=>{by[x.day||x.id]=x});
+  const sum=k=>S.visits.reduce((s,x)=>s+(x[k]||0),0),days=[...Array(14)].map((_,i)=>{const t=t0-(13-i)*DAY,r=by[key(t)]||{};return {t,v:r.v||0,pv:r.pv||0,nu:r.nu||0}});
+  return {pv:sum("pv"),v:sum("v"),nu:sum("nu"),today:days[13],days};
+}
 function bindDash(){
+  {const VS=visitStats(),cv=$("cVisit");cv.innerHTML=barChart(VS.days.map(x=>({t:x.t,a:x.v})),cv.clientWidth);bindTips(cv,i=>{const d=VS.days[i];return `<b>${md(d.t)}</b><br>방문 ${d.v} · 조회 ${d.pv} · 새 방문자 ${d.nu}`})}
   const daily=dailySeries(14),cd=$("cDaily");cd.innerHTML=barChart(daily,cd.clientWidth);bindTips(cd,i=>{const d=daily[i];return `<b>${md(d.t)}</b><br>학습자 ${d.a}명 · 카드 ${d.c} · 퀴즈 ${d.q}`});
   const R=S.rows;bindTips($("cStage"),i=>{const t=TIERS[i],n=R.filter(r=>r.tier===t).length;return `<b>${STAGE[t].name}</b> ${STAGE[t].range}<br>${n}명 · 전체의 ${pct(n,R.length)??0}%`});
   $("main").querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
@@ -650,6 +669,7 @@ async function loadLive(manual){
         render()},e=>{S.err="질문: "+fsErr(e);S.unsubQ=null;render()})}catch(e){S.err="질문: "+fsErr(e)}
   }
   try{const s=await F.getDocs(F.query(F.collection(db,"tx"),F.orderBy("at","desc"),F.limit(400)));S.tx=s.docs.map(d=>Object.assign({id:d.id},d.data()))}catch(e){S.err=(S.err?S.err+" ":"")+"결제 내역: "+fsErr(e)}
+  try{const s=await F.getDocs(F.collection(db,"visits"));S.visits=s.docs.map(d=>Object.assign({id:d.id},d.data()))}catch(e){}
   if(!S.unsubS){try{S.unsubS=F.onSnapshot(F.query(F.collection(db,"support"),F.orderBy("created","desc"),F.limit(200)),s=>{const prev=new Set(S.support.map(t=>t.id));S.support=s.docs.map(d=>Object.assign({id:d.id},d.data()));
       const fresh=S.support.filter(t=>!prev.has(t.id)&&t.status==="open").length;if(S.refreshedAt&&fresh)toast(`고객 지원 요청 ${fresh}건이 들어왔어요.`);
       const L=$("tkList");if(S.tab==="pay"&&L&&L.contains(document.activeElement)){renderBar();return}if(S.openUser||S.csvOpen){renderBar();return}render()},e=>{S.unsubS=null})}catch(e){}}
@@ -861,7 +881,7 @@ function bindPay(){
     }catch(x){er.textContent=fsErr(x);er.hidden=false}};
   $("main").querySelectorAll("tr[data-u]").forEach(tr=>{if(tr.dataset.u&&S.rows.some(r=>r.id===tr.dataset.u))tr.onclick=()=>openUser(tr.dataset.u)});
 }
-S.tkFind={};S.tkMemo={};
+S.tkFind={};S.tkMemo={};S.visits=[];
 
 /* demo: 14 days of question arrivals, mock payments, support requests */
 function genOpsDemo(users){
@@ -882,12 +902,13 @@ function genOpsDemo(users){
     {id:"s3",type:"결제 오류",email:users[6].d.email,uid:users[6].id,name:users[6].d.name,text:"5,000원 결제 완료 화면은 떴는데 캐시가 안 들어왔어요.",status:"open",created:now-50*6e4},
     {id:"s4",type:"비밀번호 문제",email:users[2].d.email,uid:null,name:"",text:"비밀번호 재설정 메일이 안 와요.",status:"done",memo:"스팸함 확인 안내, 재발송 후 로그인 확인",by:"데모 관리자",doneAt:now-2*DAY,created:now-2*DAY-3*36e5}
   ];
-  return {hist,tx,sup};
+  const visits=[];for(let d=29;d>=0;d--){const t=new Date(t0-d*DAY),v=Math.round((8+R()*10)*(d<=3?1.6:1)+(29-d)*.4),day=`${t.getFullYear()}${String(t.getMonth()+1).padStart(2,"0")}${String(t.getDate()).padStart(2,"0")}`;visits.push({id:day,day,v,pv:Math.round(v*(2.2+R())),nu:Math.max(0,Math.round(v*(d>20?.6:.2)*R()))})}
+  return {hist,tx,sup,visits};
 }
 
 /* ---------- start ---------- */
 const h0=location.hash.slice(1);if(TABS.some(x=>x[0]===h0))S.tab=h0;
-if(S.mode==="demo"){const D=genDemo();S.users=D.users;S.qs=D.qs;S.cfgAt=0;const O=genOpsDemo(D.users);S.hist=O.hist;S.tx=O.tx;S.support=O.sup;rebuild();render()}else startLive();
+if(S.mode==="demo"){const D=genDemo();S.users=D.users;S.qs=D.qs;S.cfgAt=0;const O=genOpsDemo(D.users);S.hist=O.hist;S.tx=O.tx;S.support=O.sup;S.visits=O.visits;rebuild();render()}else startLive();
 setInterval(()=>{if(S.tab==="qa"&&!S.gate&&!$("layer").innerHTML){const L=$("qaList");if(L&&L.contains(document.activeElement))return;render()}},60000);
 </script>
 </body>
