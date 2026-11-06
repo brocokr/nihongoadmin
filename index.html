@@ -131,6 +131,7 @@ tbody tr{cursor:pointer}
 tbody tr:hover td{background:var(--soft)}
 .who{display:flex;flex-direction:column;line-height:1.3}
 .who small{color:var(--muted);font-size:12px}
+table.wrapt td{white-space:normal;min-width:84px;vertical-align:top}
 .empty{padding:28px 10px;text-align:center;color:var(--muted)}
 .risk{display:flex;flex-direction:column}
 .risk button{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;text-align:left;border:0;background:none;border-bottom:1px solid var(--line);padding:10px 2px}
@@ -270,7 +271,7 @@ const ago=t=>{if(!t)return "기록 없음";const d=Math.round((day0(Date.now())-
 const pct=(a,b)=>b?Math.round(a/b*100):null;
 const dayTot=v=>v?(v.c||0)+(v.q||0)+(v.w||0):0;
 const isOpen=q=>q.status==="wait"||q.status==="assigned";
-const isLate=q=>isOpen(q)&&Date.now()-q.created>SLA;
+const isLate=q=>isOpen(q)&&Date.now()-q.created>(q.fast?30*6e4:SLA);
 const tutorOf=id=>TUTORS.find(t=>t.id===id);
 const opNow=()=>{const h=new Date().getHours();return h>=HOURS[0]&&h<HOURS[1]};
 let toastT;function toast(m){const t=$("toast");t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2800)}
@@ -282,7 +283,7 @@ const ASK='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="c
 /* ---------- state ---------- */
 const S={mode:LIVE?"live":"demo",fb:null,me:null,gate:LIVE?"loading":null,gateMsg:"",users:[],rows:[],qs:[],cfg:JSON.parse(JSON.stringify(DEF_CFG)),cfgAt:0,
   tab:"dashboard",qf:"open",uq:"",us:"all",uo:"recent",drafts:{},pick:{},cancelAsk:null,refreshedAt:0,err:"",pending:false,openUser:null};
-const TABS=[["dashboard","대시보드"],["learners","학습자"],["qa","선배 Q&A"],["notice","공지·배너"]];
+const TABS=[["dashboard","대시보드"],["ops","운영 현황"],["learners","학습자"],["qa","선배 Q&A"],["pay","결제·지원"],["notice","공지·배너"]];
 
 /* ---------- learner summary: the same numbers for demo and live data ---------- */
 function summarize(id,d){
@@ -296,7 +297,7 @@ function summarize(id,d){
     w7days:w7.length,w7n:sum(w7,x=>dayTot(x.v)),w7q:sum(w7,x=>x.v.q||0),w7qc:sum(w7,x=>x.v.qc||0),w7s:sum(w7,x=>x.v.s||0),w7goal:w7.filter(x=>dayTot(x.v)>=goal).length,
     allc:sum(days,x=>x.v.c||0),allq:sum(days,x=>x.v.q||0),allqc:sum(days,x=>x.v.qc||0),alls:sum(days,x=>x.v.s||0),
     streak:st&&stLast&&t0-stLast<=DAY?st.n||0:0,diag:J("diag"),track:J("track")||"talk",target:J("target"),
-    wrongN:wr?Object.keys(wr.q||{}).length+Object.keys(wr.c||{}).length:0,reset:d.data&&d.data._reset!=null,adminEdit:d.adminEdit||null};
+    wrongN:wr?Object.keys(wr.q||{}).length+Object.keys(wr.c||{}).length:0,cash:+J("cash")||0,reset:d.data&&d.data._reset!=null,adminEdit:d.adminEdit||null};
 }
 function rebuild(){S.rows=S.users.map(u=>summarize(u.id,u.d));S.refreshedAt=Date.now()}
 function qCount(uid){return S.qs.filter(q=>q.uid===uid).length}
@@ -361,15 +362,15 @@ function renderBar(){
   $("refresh").hidden=S.mode==="live"&&!S.me;
   const open=S.qs.filter(isOpen).length,late=S.qs.filter(isLate).length;
   $("tabs").hidden=!!S.gate;
-  $("tabs").innerHTML=TABS.map(([k,n])=>`<button class="tab" data-t="${k}"${S.tab===k?' aria-current="page"':""}>${n}${k==="learners"?` <span class="badge">${S.rows.length}</span>`:k==="qa"&&open?` <span class="badge${late?" hot":""}">${open}</span>`:""}</button>`).join("");
+  $("tabs").innerHTML=TABS.map(([k,n])=>`<button class="tab" data-t="${k}"${S.tab===k?' aria-current="page"':""}>${n}${k==="learners"?` <span class="badge">${S.rows.length}</span>`:k==="qa"&&open?` <span class="badge${late?" hot":""}">${open}</span>`:k==="pay"&&S.support.some(t=>t.status==="open")?` <span class="badge hot">${S.support.filter(t=>t.status==="open").length}</span>`:""}</button>`).join("");
 }
 function render(){
   renderBar();const m=$("main");
   if(S.gate){m.innerHTML=gateHTML();bindGate();return}
   const demo=S.mode==="demo"?`<div class="demo"><span><b>데모 데이터예요.</b> 학습자 24명과 질문 14개는 시연용으로 만든 가짜 기록이에요. firebase-config.js를 채워 GitHub에 올리면 실제 학습자 기록과 질문이 보여요. 여기서 바꾼 내용은 새로 고치면 처음 상태로 돌아가요.</span></div>`:"";
   const err=S.err?`<div class="demo" style="background:var(--bad-soft)"><span><b style="color:var(--bad)">불러오지 못한 데이터가 있어요.</b> ${esc(S.err)}</span></div>`:"";
-  m.innerHTML=demo+err+({dashboard:dashHTML,learners:learnersHTML,qa:qaHTML,notice:noticeHTML}[S.tab])();
-  ({dashboard:bindDash,learners:bindLearners,qa:bindQA,notice:bindNotice}[S.tab])();
+  m.innerHTML=demo+err+({dashboard:dashHTML,ops:opsHTML,learners:learnersHTML,qa:qaHTML,pay:payHTML,notice:noticeHTML}[S.tab])();
+  ({dashboard:bindDash,ops:bindOps,learners:bindLearners,qa:bindQA,pay:bindPay,notice:bindNotice}[S.tab])();
 }
 function go(t){if(!TABS.some(x=>x[0]===t))t="dashboard";S.tab=t;try{if(location.hash.slice(1)!==t)history.replaceState(null,"","#"+t)}catch(e){}$("tip").hidden=true;render();window.scrollTo(0,0)}
 $("tabs").onclick=e=>{const b=e.target.closest("[data-t]");if(b)go(b.dataset.t)};
@@ -447,6 +448,9 @@ function drawUser(){
     <dl class="kv"><dt>처음 공부한 날</dt><dd>${r.first?md(r.first):"–"}</dd><dt>최근 학습</dt><dd>${ago(r.last)}${r.last?` (${md(r.last)})`:""}</dd><dt>누적</dt><dd>카드 ${r.allc.toLocaleString()} · 퀴즈 ${r.allq.toLocaleString()} · ${Math.round(r.alls/60).toLocaleString()}분</dd>
       <dt>배치 경기</dt><dd>${r.diag&&r.diag.L?`Lv.${r.diag.L} · ${STAGE[r.diag.rec]?STAGE[r.diag.rec].name:"–"} 단계로 시작`:"건너뜀"}</dd><dt>오답 노트</dt><dd>${r.wrongN}개</dd><dt>질문</dt><dd>${qs.length?`${qs.length}개 · 처리 중 ${qs.filter(isOpen).length}개`:"없음"}</dd><dt>계정 저장</dt><dd>${when(r.updatedAt)}</dd></dl>
     ${r.adminEdit?`<p class="muted" style="margin:0;font-size:12px">${when(r.adminEdit.at)} ${esc(r.adminEdit.by||"관리자")}가 ${esc(r.adminEdit.what||"기록")}을(를) 바꿨어요.</p>`:""}
+    <div class="box"><div class="ph"><h3>캐시</h3><span class="num">${(r.cash||0).toLocaleString()} 캐시</span></div>
+      <div class="row"><select id="dAmt" aria-label="보상 캐시"><option>50</option><option selected>100</option><option>300</option></select><select id="dWhy" aria-label="보상 사유">${COMP_REASONS.map(x=>`<option>${x}</option>`).join("")}</select><button class="btn ghost sm" id="dComp">보상 지급</button></div>
+      <p class="muted" style="margin:0;font-size:12px">지급하면 학습자가 앱을 열 때 캐시가 들어가고 알림이 떠요.</p></div>
     <div class="box"><h3>레벨 조정</h3><p class="muted" style="margin:0;font-size:12.5px">배치가 잘못됐거나 고객 테스트 시나리오를 맞출 때 써요. 학습자가 앱을 다시 열면 반영돼요. 학습자가 앱을 쓰는 중이면 그 기기 기록이 덮어쓸 수 있으니 쉬는 시간에 바꿔 주세요.</p>
       <div class="row"><label for="dLv" class="muted" style="font-size:13px">새 레벨</label><input type="number" id="dLv" min="1" max="300" value="${r.L}" style="width:96px"><span class="muted" id="dLvHint" style="font-size:12.5px"></span><button class="btn sm" id="dLvGo">적용</button></div><p class="err" id="dErr" hidden></p></div>
     <div class="box"><h3>기록 초기화</h3>${S.confirm==="reset"?`<p style="margin:0;font-size:13.5px">${esc(r.name)}님의 레벨, 오답 노트, 단어장, 연속 학습이 모두 지워지고 배치 경기부터 다시 시작해요. 되돌릴 수 없어요.</p><div class="row"><button class="btn ghost sm" id="dNo">취소</button><button class="btn danger sm" id="dYes">모두 지우기</button></div>`:`<div class="row" style="justify-content:space-between"><span class="muted" style="font-size:12.5px">테스트 참가자를 처음 상태로 돌릴 때 써요.</span><button class="btn ghost sm" id="dReset" style="color:var(--bad)">초기화…</button></div>`}</div>
@@ -457,6 +461,7 @@ function drawUser(){
     if(L===r.L){$("dErr").textContent="지금 레벨과 같아요.";$("dErr").hidden=false;return}
     await editUser(r,"level",L)};
   if($("dReset"))$("dReset").onclick=()=>{S.confirm="reset";drawUser()};
+  $("dComp").onclick=async()=>{const amt=+$("dAmt").value,why=$("dWhy").value;try{await grantComp(r.id,r.name,amt,why,"comp");toast(`${r.name}님에게 ${amt}캐시를 보상했어요.`)}catch(e){toast(fsErr(e))}};
   if($("dNo"))$("dNo").onclick=()=>{S.confirm=null;drawUser()};
   if($("dYes"))$("dYes").onclick=()=>editUser(r,"reset");
   setTimeout(()=>{try{$("dX").focus()}catch(e){}},0);
@@ -516,7 +521,7 @@ function qaHTML(){
 function qCard(q){
   const [cls,label]=stOf(q),t=q.tutor&&tutorOf(q.tutor),open=isOpen(q),late=isLate(q),pick=S.pick[q.id]||q.tutor||suggest(q);
   return `<article class="q${late?" late":""}" data-q="${esc(q.id)}">
-    <div class="qh"><span class="st ${cls}">${label}</span><b>${esc(q.name||"학습자")}</b><span class="stg" data-l="${q.level||"beg"}">${STAGE[q.level]?STAGE[q.level].name:"–"}${q.lv?` Lv.${q.lv}`:""}</span><span>${esc(q.type)}</span><span>${when(q.created)}</span>${open?`<span${late?' style="color:var(--bad);font-weight:700"':""}>${dur(Date.now()-q.created)} 기다리는 중</span>`:""}</div>
+    <div class="qh"><span class="st ${cls}">${label}</span><b>${esc(q.name||"학습자")}</b><span class="stg" data-l="${q.level||"beg"}">${STAGE[q.level]?STAGE[q.level].name:"–"}${q.lv?` Lv.${q.lv}`:""}</span><span>${esc(q.type)}</span>${q.fast?`<span class="st st-late" style="background:var(--sun-soft);color:var(--sun)">빠른 답변 · 30분</span>`:""}${q.paid?`<span>${q.paid.toLocaleString()}캐시${q.refunded?" · 환불됨":""}${q.compensated?" · 지연 보상됨":""}</span>`:q.compensated?"<span>지연 보상됨</span>":""}<span>${when(q.created)}</span>${open?`<span${late?' style="color:var(--bad);font-weight:700"':""}>${dur(Date.now()-q.created)} 기다리는 중</span>`:""}</div>
     ${q.ref&&q.ref.label?`<span class="ref">첨부: ${esc(q.ref.label)}</span>`:""}
     <p class="qt">${esc(q.text)}</p>
     ${q.reassignReq&&open?`<span class="flag">${WARN} 학습자가 다른 선배에게 넘겨 달라고 요청했어요 (${when(q.reassignReq)})</span>`:""}
@@ -527,7 +532,7 @@ function qCard(q){
       <div class="row"><label class="muted" for="tp-${esc(q.id)}" style="font-size:12.5px">담당 선배</label><select id="tp-${esc(q.id)}" data-pick>${TUTORS.map(x=>`<option value="${x.id}"${x.id===pick?" selected":""}>${x.name}${x.spec.includes(q.type)?" · 전문":""}</option>`).join("")}</select>${pick!==q.tutor?`<button class="btn ghost sm" data-act="assign">${q.tutor?"다시 배정":"배정"}</button>`:""}</div>
       <textarea id="an-${esc(q.id)}" data-draft placeholder="${esc((tutorOf(pick)||TUTORS[0]).name)} 이름으로 답변이 보내져요. 10자 이상 적어 주세요.">${esc(S.drafts[q.id]||"")}</textarea>
       <p class="err" id="er-${esc(q.id)}" hidden></p>
-      ${S.cancelAsk===q.id?`<div class="row"><select id="cr-${esc(q.id)}" aria-label="취소 사유"><option>중복 질문</option><option>학습과 관계없는 질문</option><option>부적절한 내용</option></select><button class="btn ghost sm" data-act="cancelNo">그만두기</button><button class="btn danger sm" data-act="cancelYes">이 사유로 취소</button></div>`
+      ${S.cancelAsk===q.id?`<div class="row"><select id="cr-${esc(q.id)}" aria-label="취소 사유"><option>중복 질문</option><option>학습과 관계없는 질문</option><option>부적절한 내용</option></select><button class="btn ghost sm" data-act="cancelNo">그만두기</button><button class="btn danger sm" data-act="cancelYes">이 사유로 취소</button></div>${q.paid?`<p class="muted" style="margin:0;font-size:12px">취소하면 학습자 앱에서 ${q.paid.toLocaleString()}캐시가 자동으로 환불돼요.</p>`:""}`
         :`<div class="row" style="justify-content:space-between"><button class="btn ghost sm" data-act="cancel" style="color:var(--bad)">질문 취소…</button><button class="btn sm" data-act="answer">답변 보내기</button></div>`}
     </div>`:""}
   </article>`;
@@ -588,7 +593,7 @@ function bindNotice(){
   f.onsubmit=async e=>{e.preventDefault();const c=formCfg(),er=$("nErr");er.hidden=true;
     if(c.notice.on&&!c.notice.text){er.textContent="공지 내용을 적거나 ‘공지 보이기’를 꺼 주세요.";er.hidden=false;return}
     $("nSave").disabled=true;
-    try{c.updatedAt=Date.now();c.by=S.me?S.me.email:"데모 관리자";if(S.mode==="live"){const {F,db}=S.fb;await F.setDoc(F.doc(db,"config","app"),c)}
+    try{c.updatedAt=Date.now();c.by=S.me?S.me.email:"데모 관리자";if(S.mode==="live"){const {F,db}=S.fb;await F.setDoc(F.doc(db,"config","app"),c,{merge:true})}
       S.cfg=c;S.cfgAt=c.updatedAt;render();toast("저장했어요. 학습자가 앱을 새로 열면 보여요.")}
     catch(x){$("nSave").disabled=false;er.textContent=fsErr(x);er.hidden=false}};
 }
@@ -634,7 +639,7 @@ async function startLive(){
 async function loadLive(manual){
   const {F,db}=S.fb;S.err="";
   try{const snap=await F.getDocs(F.collection(db,"users"));S.users=snap.docs.map(d=>({id:d.id,d:d.data()}))}catch(e){S.err="학습자 기록: "+fsErr(e)}
-  try{const c=await F.getDoc(F.doc(db,"config","app"));if(c.exists()){const v=c.data();S.cfg={banner:Object.assign({},DEF_CFG.banner,v.banner||{}),notice:Object.assign({},DEF_CFG.notice,v.notice||{})};S.cfgAt=v.updatedAt||0}}catch(e){}
+  try{const c=await F.getDoc(F.doc(db,"config","app"));if(c.exists()){const v=c.data();if(v.ops&&v.ops.shifts){S.ops={handle:v.ops.handle||12,shifts:Object.assign({},DEF_OPS.shifts,v.ops.shifts)};S.opsAt=v.ops.updatedAt||0}S.cfg={banner:Object.assign({},DEF_CFG.banner,v.banner||{}),notice:Object.assign({},DEF_CFG.notice,v.notice||{})};S.cfgAt=v.updatedAt||0}}catch(e){}
   if(!S.unsubQ){
     try{S.unsubQ=F.onSnapshot(F.query(F.collection(db,"questions"),F.orderBy("created","desc"),F.limit(300)),s=>{
         const prev=new Set(S.qs.map(q=>q.id));S.qs=s.docs.map(d=>Object.assign({id:d.id},d.data()));
@@ -644,6 +649,10 @@ async function loadLive(manual){
         if(S.openUser||S.csvOpen){renderBar();return}
         render()},e=>{S.err="질문: "+fsErr(e);S.unsubQ=null;render()})}catch(e){S.err="질문: "+fsErr(e)}
   }
+  try{const s=await F.getDocs(F.query(F.collection(db,"tx"),F.orderBy("at","desc"),F.limit(400)));S.tx=s.docs.map(d=>Object.assign({id:d.id},d.data()))}catch(e){S.err=(S.err?S.err+" ":"")+"결제 내역: "+fsErr(e)}
+  if(!S.unsubS){try{S.unsubS=F.onSnapshot(F.query(F.collection(db,"support"),F.orderBy("created","desc"),F.limit(200)),s=>{const prev=new Set(S.support.map(t=>t.id));S.support=s.docs.map(d=>Object.assign({id:d.id},d.data()));
+      const fresh=S.support.filter(t=>!prev.has(t.id)&&t.status==="open").length;if(S.refreshedAt&&fresh)toast(`고객 지원 요청 ${fresh}건이 들어왔어요.`);
+      const L=$("tkList");if(S.tab==="pay"&&L&&L.contains(document.activeElement)){renderBar();return}if(S.openUser||S.csvOpen){renderBar();return}render()},e=>{S.unsubS=null})}catch(e){}}
   rebuild();render();if(manual)toast("최신 기록을 불러왔어요.");
 }
 
@@ -670,9 +679,9 @@ function genDemo(){
   const U=k=>users[k],now=Date.now(),m=6e4,h=36e5;
   const Q=(k,o)=>Object.assign({id:"dq-"+Math.random().toString(36).slice(2,8),uid:U(k).id,name:U(k).d.name,email:U(k).d.email,lv:U(k).d.lv,level:tierOf(U(k).d.lv),ref:null,status:"wait",tutor:null,assignedAt:null,answer:null,answeredAt:null,rating:null,reassigned:0,reassignReq:null},o);
   const qs=[
-    Q(4,{type:"문법",text:"「〜ても」랑 「〜のに」 둘 다 ‘~인데도’로 번역되던데 어떻게 구분해요?",created:now-12*m}),
+    Q(4,{paid:200,type:"문법",text:"「〜ても」랑 「〜のに」 둘 다 ‘~인데도’로 번역되던데 어떻게 구분해요?",created:now-12*m}),
     Q(1,{type:"읽기·발음",text:"「今日」를 きょう라고 읽는데 こんにち라고 읽는 경우도 있나요?",created:now-2.7*h,ref:{label:"Anki 단어 · 입문 · 今日"}}),
-    Q(11,{type:"애니·J-POP 표현",text:"애니에서 「やばい」를 좋을 때도 쓰던데 원래 나쁜 뜻 아니에요?",created:now-35*m,status:"assigned",tutor:"T-02",assignedAt:now-30*m}),
+    Q(11,{fast:true,paid:500,type:"애니·J-POP 표현",text:"애니에서 「やばい」를 좋을 때도 쓰던데 원래 나쁜 뜻 아니에요?",created:now-35*m,status:"assigned",tutor:"T-02",assignedAt:now-30*m}),
     Q(7,{type:"뜻·뉘앙스",text:"「すみません」과 「ごめんなさい」는 언제 각각 써요? 편의점 점원한테는 뭐라고 해요?",created:now-2.25*h,status:"assigned",tutor:"T-01",assignedAt:now-2.1*h,reassignReq:now-8*m}),
     Q(14,{type:"기타",text:"N3 시험까지 한 달 남았는데 단어랑 문법 중 뭘 먼저 하면 좋을까요?",created:now-50*m}),
     Q(9,{type:"읽기·발음",text:"「生」 한자는 읽는 법이 너무 많은데 다 외워야 해요?",created:now-26*h,status:"done",tutor:"T-03",assignedAt:now-26*h+5*m,answer:"전부 한꺼번에 외울 필요는 없어요. 먼저 せい(学生), しょう(一生), い-きる(生きる), う-まれる(生まれる), なま(生ビール) 다섯 가지만 단어와 함께 익히세요. 나머지 읽기는 새 단어에서 만날 때 하나씩 붙이면 돼요.",answeredAt:now-25.4*h,rating:"good"}),
@@ -688,9 +697,197 @@ function genDemo(){
   return {users,qs};
 }
 
+/* ---------- 운영 현황: 수요 · 처리능력 · 병목 ---------- */
+const OPS_HOURS=[...Array(15)].map((_,i)=>9+i);              // 09:00–24:00 운영, 1시간 단위
+const DEF_OPS={handle:12,shifts:{"T-01":[19,24],"T-02":[13,19],"T-03":[9,14]}};
+const FAST_SLA=30*6e4,TXL={charge:"충전",earn:"적립",spend:"사용",refund:"환불",comp:"보상",fail:"결제 실패"};
+S.ops=JSON.parse(JSON.stringify(DEF_OPS));S.mult=1;S.absent="";S.hist=[];S.tx=[];S.support=[];S.comps=[];S.opsAt=0;S.tkFilter="open";
+const wonf=n=>Math.round(n).toLocaleString("ko-KR");
+function demandBy(){ /* 최근 14일 시간대별 하루 평균 질문 수 */
+  const src=S.hist.length?S.hist:S.qs.map(q=>q.created),from=day0(Date.now())-13*DAY,c={};
+  src.forEach(t=>{if(t>=from){const h=new Date(t).getHours();c[h]=(c[h]||0)+1}});
+  return OPS_HOURS.map(h=>(c[h]||0)/14*S.mult);
+}
+const onShift=(id,h)=>{const s=S.ops.shifts[id];return s&&h>=s[0]&&h<s[1]&&S.absent!==id};
+function capRows(){
+  const lam=demandBy(),per=60/S.ops.handle;
+  return OPS_HOURS.map((h,i)=>{const c=TUTORS.filter(t=>onShift(t.id,h)).length,mu=c*per,rho=mu?lam[i]/mu:(lam[i]>0?Infinity:0);
+    /* 대기 시간 근사 (Sakasegawa M/M/c): Wq ≈ ρ^(√(2(c+1))−1) / (c(1−ρ)) × 처리시간 */
+    const wq=c&&rho<1?Math.pow(rho,Math.sqrt(2*(c+1))-1)/(c*(1-rho))*S.ops.handle:Infinity;
+    return {h,lam:lam[i],c,mu,rho,wq,st:rho>=1?"bad":rho>=.7?"warn":"ok"}});
+}
+const ST={ok:["여유","ok"],warn:["주의","warn"],bad:["병목","bad"]};
+function opsChart(R,W){
+  W=Math.max(300,Math.min(680,Math.round(W||600)));const H=210,ml=30,mr=6,mt=14,mb=26,iw=W-ml-mr,ih=H-mt-mb,max=niceMax(Math.max(1,...R.map(r=>Math.max(r.lam,r.mu)))),bw=iw/R.length,w=Math.min(22,bw*.56);
+  const y=v=>mt+ih-Math.min(v,max)/max*ih,ticks=[0,max/2,max].map(v=>Math.round(v*10)/10);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="시간대별 질문 수요와 처리능력">
+    <g class="grid">${ticks.map(v=>`<line x1="${ml}" x2="${W-mr}" y1="${y(v)}" y2="${y(v)}"/><text x="${ml-6}" y="${y(v)+4}" text-anchor="end">${v}</text>`).join("")}</g>
+    ${R.map((r,i)=>{const x=ml+i*bw,bx=x+(bw-w)/2,top=y(r.lam),hgt=mt+ih-top,rr=Math.min(4,w/2,hgt);
+      return `<g data-i="${i}"><rect class="hit" x="${x}" y="${mt}" width="${bw}" height="${ih+mb}"/>
+        ${hgt>0?`<path class="bar" style="fill:${r.st==="bad"?"var(--bad)":"var(--accent)"}" d="M${bx},${mt+ih}V${top+rr}Q${bx},${top} ${bx+rr},${top}H${bx+w-rr}Q${bx+w},${top} ${bx+w},${top+rr}V${mt+ih}Z"/>`:""}
+        <line x1="${x+2}" x2="${x+bw-2}" y1="${y(r.mu)}" y2="${y(r.mu)}" style="stroke:var(--ink);stroke-width:2;stroke-dasharray:4 3"/>
+        ${i%2===0?`<text x="${x+bw/2}" y="${H-8}" text-anchor="middle">${r.h}시</text>`:""}</g>`}).join("")}
+  </svg>`;
+}
+function playbook(R){
+  const out=[],per=60/S.ops.handle;let run=null;
+  R.forEach((r,i)=>{if(r.st==="bad"){if(!run)run={a:r.h,b:r.h+1,gap:0};run.b=r.h+1;run.gap=Math.max(run.gap,r.lam-r.mu)}else if(run){out.push(run);run=null}});if(run)out.push(run);
+  return out.map(g=>{const need=Math.max(1,Math.ceil(g.gap/per)),free=TUTORS.filter(t=>t.id!==S.absent&&!OPS_HOURS.filter(h=>h>=g.a&&h<g.b).every(h=>onShift(t.id,h)));
+    return {range:`${g.a}~${g.b}시`,gap:g.gap,need,who:free.map(t=>t.name)}});
+}
+function opsHTML(){
+  const R=capRows(),bad=R.filter(r=>r.st==="bad"),dem=R.reduce((s,r)=>s+r.lam,0),cap=R.reduce((s,r)=>s+r.mu,0),peak=R.slice().sort((a,b)=>b.rho-a.rho)[0];
+  const open=S.qs.filter(isOpen),hNow=new Date().getHours(),cur=R.find(r=>r.h===hNow),muNow=cur?cur.mu:0;
+  const eta=open.length?(muNow?Math.round(open.length/muNow*60):null):0,PB=playbook(R);
+  const sel=(id,v,lo,hi)=>`<select id="${id}" aria-label="${id}">${[...Array(hi-lo+1)].map((_,k)=>lo+k).map(x=>`<option${x===v?" selected":""}>${x}</option>`).join("")}</select>`;
+  return `<section class="kpis" aria-label="수요와 처리능력 요약">
+    <div class="kpi"><span class="kpi-l">하루 예상 질문</span><b class="kpi-v">${dem.toFixed(1)}<small>건</small></b><span class="kpi-s">최근 14일 평균${S.mult!==1?` × ${S.mult}`:""}</span></div>
+    <div class="kpi"><span class="kpi-l">하루 최대 처리량</span><b class="kpi-v">${Math.round(cap)}<small>건</small></b><span class="kpi-s">근무 ${R.reduce((s,r)=>s+r.c,0)}시간 × 시간당 ${(60/S.ops.handle).toFixed(1)}건</span></div>
+    <div class="kpi"><span class="kpi-l">가장 바쁜 시간</span><b class="kpi-v">${peak.h}<small>시</small></b><span class="kpi-s">이용률 ${isFinite(peak.rho)?Math.round(peak.rho*100)+"%":"처리 인원 없음"}</span>${peak.st!=="ok"?`<span class="chip ${ST[peak.st][1]}">${WARN} ${ST[peak.st][0]}</span>`:`<span class="chip ok">${OK} 여유</span>`}</div>
+    <div class="kpi"><span class="kpi-l">지금 대기 · 예상 답변</span><b class="kpi-v">${open.length}<small>건</small></b><span class="kpi-s">${!open.length?"기다리는 질문이 없어요":eta==null?"지금은 근무 튜터가 없어요. 다음 근무 시작 때 처리돼요":`새 질문은 약 ${eta}분 뒤 답변 (근무 ${cur.c}명)`}</span></div>
+  </section>
+  <section class="panel"><div class="ph"><h2>시간대별 수요와 처리능력</h2><p>막대: 시간당 평균 질문 수 · 점선: 시간당 처리능력 · 빨간 막대는 병목</p></div>
+    <div class="chart" id="cOps">${opsChart(R)}</div>
+    <div class="tw"><table><thead><tr><th>시간</th>${R.map(r=>`<th class="r">${r.h}</th>`).join("")}</tr></thead><tbody>
+      <tr><td>수요(건/시)</td>${R.map(r=>`<td class="r num">${r.lam.toFixed(1)}</td>`).join("")}</tr>
+      <tr><td>근무 튜터</td>${R.map(r=>`<td class="r num">${r.c}</td>`).join("")}</tr>
+      <tr><td>처리능력(건/시)</td>${R.map(r=>`<td class="r num">${r.mu.toFixed(1)}</td>`).join("")}</tr>
+      <tr><td>이용률</td>${R.map(r=>`<td class="r num" style="color:${r.st==="bad"?"var(--bad)":r.st==="warn"?"var(--sun)":"inherit"}">${isFinite(r.rho)?Math.round(r.rho*100)+"%":"–"}</td>`).join("")}</tr>
+      <tr><td>예상 대기</td>${R.map(r=>`<td class="r num">${r.lam===0?"–":isFinite(r.wq)?Math.round(r.wq)+"분":"계속 늘어남"}</td>`).join("")}</tr>
+    </tbody></table></div>
+    <p class="muted" style="margin:0;font-size:12px">시간 단위 1시간 · 질문 1건 처리 ${S.ops.handle}분 가정 · 처리능력 = 근무 튜터 수 × 60 ÷ 처리시간 · 이용률 = 수요 ÷ 처리능력 · 대기 시간은 M/M/c 근사(Sakasegawa)로 계산해요.</p></section>
+  <div class="grid2">
+    <section class="panel"><div class="ph"><h2>근무표와 가정</h2><p>바꾸면 바로 다시 계산돼요</p></div>
+      <div class="tw"><table><thead><tr><th>선배</th><th>시작</th><th>끝</th><th>오늘 결근</th></tr></thead><tbody>
+        ${TUTORS.map(t=>`<tr><td><b>${t.name}</b><br><span class="muted" style="font-size:12px">${t.spec.join(" · ")}</span></td><td>${sel("s-"+t.id,S.ops.shifts[t.id][0],9,23)}</td><td>${sel("e-"+t.id,S.ops.shifts[t.id][1],10,24)}</td><td><input type="radio" name="absent" value="${t.id}"${S.absent===t.id?" checked":""} aria-label="${t.name} 결근"></td></tr>`).join("")}
+        <tr><td colspan="3" class="muted">모두 출근</td><td><input type="radio" name="absent" value=""${!S.absent?" checked":""} aria-label="모두 출근"></td></tr></tbody></table></div>
+      <div class="row"><label for="opH" class="muted" style="font-size:13px">질문 1건 처리 시간</label><input type="number" id="opH" min="3" max="60" value="${S.ops.handle}" style="width:80px"><span class="muted">분</span></div>
+      <div class="row"><label for="opM" class="muted" style="font-size:13px">수요 시나리오</label><select id="opM">${[[1,"평소"],[1.5,"시험 2주 전 (×1.5)"],[2,"시험 직전·이벤트 (×2)"]].map(([v,n])=>`<option value="${v}"${S.mult===v?" selected":""}>${n}</option>`).join("")}</select></div>
+      <div class="row" style="justify-content:space-between"><span class="muted" style="font-size:12px">${S.opsAt?`근무표 저장 ${when(S.opsAt)}`:"근무표는 저장해야 다음에도 남아요"}</span><button class="btn sm" id="opSave">근무표 저장</button></div></section>
+    <section class="panel"><div class="ph"><h2>병목과 대응</h2><p>${bad.length?`병목 ${bad.length}시간`:"지금 조건에서는 병목이 없어요"}</p></div>
+      ${PB.length?PB.map(p=>`<div class="box"><b>${p.range} · 시간당 ${p.gap.toFixed(1)}건 초과</b><ol class="rules" style="color:var(--ink)">
+        <li>튜터 ${p.need}명을 이 시간에 더 배치해요${p.who.length?` (가능: ${p.who.join(", ")})`:""}.</li>
+        <li>이 시간에는 빠른 답변 판매를 잠시 멈추고, 무료 질문을 하루 2개에서 1개로 줄여요.</li>
+        <li>학습자에게 예상 대기 시간을 공지로 알려요.</li></ol>
+        <button class="btn ghost sm" data-notice="${p.range}">공지로 안내하기</button></div>`).join(""):`<p class="muted" style="margin:0">모든 운영 시간에서 처리능력이 수요보다 커요. 시나리오를 ‘시험 직전’으로 바꾸거나 결근을 골라 확인해 보세요.</p>`}
+      <h3>상황별 대응 기준</h3>
+      <div class="tw"><table class="wrapt"><thead><tr><th>상황</th><th>알아채는 신호</th><th>책임자</th><th>대응</th></tr></thead><tbody>
+        <tr><td>수요 집중</td><td>이용률 100% 이상, 대기 5건 이상</td><td>운영 매니저</td><td>대기 튜터 호출·근무 연장, 빠른 답변 판매 중지, 공지 안내</td></tr>
+        <tr><td>튜터 결근</td><td>근무 시작 10분 전까지 미접속</td><td>운영 매니저</td><td>같은 시간 튜터에게 인계, 운영진 직접 답변, 늦은 질문 자동 보상</td></tr>
+        <tr><td>배정 충돌</td><td>한 질문에 두 명이 동시에 답변 시작</td><td>먼저 배정된 튜터</td><td>배정 기록을 기준으로 한 명만 답하고, 다른 한 명은 다음 질문으로</td></tr>
+        <tr><td>운영 시간 외 접수</td><td>0~9시 질문</td><td>오전 근무 튜터</td><td>9시에 접수 순서대로 배정, 2시간 기준은 9시부터 셈</td></tr>
+        <tr><td>답변 지연</td><td>일반 2시간·빠른 답변 30분 초과</td><td>담당 튜터 → 매니저</td><td>재배정, 학습자에게 캐시 자동 보상(50 / 환불+100)</td></tr>
+      </tbody></table></div></section>
+  </div>`;
+}
+function bindOps(){
+  const R=capRows(),cd=$("cOps");cd.innerHTML=opsChart(R,cd.clientWidth);
+  bindTips(cd,i=>{const r=R[i];return `<b>${r.h}시</b> · ${ST[r.st][0]}<br>수요 ${r.lam.toFixed(1)}건 · 처리능력 ${r.mu.toFixed(1)}건<br>근무 ${r.c}명 · 이용률 ${isFinite(r.rho)?Math.round(r.rho*100)+"%":"–"}`});
+  TUTORS.forEach(t=>{["s","e"].forEach((k,j)=>{$(k+"-"+t.id).onchange=e=>{const v=+e.target.value,s=S.ops.shifts[t.id];s[j]=v;if(s[0]>=s[1]){if(j===0)s[1]=Math.min(24,v+1);else s[0]=Math.max(9,v-1)}render()}})});
+  document.querySelectorAll("input[name=absent]").forEach(r=>r.onchange=()=>{S.absent=r.value;render()});
+  $("opH").onchange=e=>{const v=Math.round(+e.target.value);if(v>=3&&v<=60){S.ops.handle=v;render()}else toast("3분에서 60분 사이로 적어 주세요.")};
+  $("opM").onchange=e=>{S.mult=+e.target.value;render()};
+  $("opSave").onclick=async()=>{try{if(S.mode==="live"){const {F,db}=S.fb;await F.setDoc(F.doc(db,"config","app"),{ops:Object.assign({},S.ops,{updatedAt:Date.now()})},{merge:true})}S.opsAt=Date.now();render();toast("근무표를 저장했어요.")}catch(e){toast(fsErr(e))}};
+  $("main").querySelectorAll("[data-notice]").forEach(b=>b.onclick=()=>{S.cfg.notice={on:true,text:`질문이 몰려 ${b.dataset.notice} 답변이 평소보다 늦어질 수 있어요. 그 시간엔 빠른 답변을 잠시 쉬어요.`,until:""};go("notice");toast("공지 문구를 채웠어요. 확인하고 저장해 주세요.")});
+}
+let rsO;addEventListener("resize",()=>{clearTimeout(rsO);rsO=setTimeout(()=>{const cd=$("cOps");if(cd&&S.tab==="ops")cd.innerHTML=opsChart(capRows(),cd.clientWidth)},150)});
+
+/* ---------- 결제·지원: 모의 결제 내역, 계정 찾기·오류 신고, 캐시 보상 ---------- */
+const COMP_REASONS=["답변 지연","문제 오류 확인","앱 오류","결제 오류","계정 복구 불편"];
+async function grantComp(uid,name,amt,reason,kind,ticket){
+  const now=Date.now(),id=now.toString(36)+Math.random().toString(36).slice(2,6),doc={uid,amt,kind:kind||"comp",reason,by:S.me?S.me.email:"데모 관리자",at:now,claimed:false,ticket:ticket||""};
+  if(S.mode==="live"){const {F,db}=S.fb;await F.setDoc(F.doc(db,"comp",id),doc)}
+  else{doc.claimed=true;S.tx.unshift({id:"c"+id,uid,name,email:"",type:doc.kind,amt,won:0,memo:`운영진 ${doc.kind==="refund"?"환불":"보상"} · ${reason}`,at:now})}
+  S.comps.unshift(Object.assign({id},doc));return true;
+}
+function payHTML(){
+  const from=Date.now()-30*DAY,T=S.tx.filter(t=>t.at>=from),sum=(k,f)=>T.filter(t=>t.type===k).reduce((s,t)=>s+f(t),0),cnt=k=>T.filter(t=>t.type===k).length;
+  const rev=sum("charge",t=>t.won||0),nC=cnt("charge"),nF=cnt("fail"),used=-sum("spend",t=>t.amt),back=sum("refund",t=>t.amt)+sum("comp",t=>t.amt);
+  const open=S.support.filter(t=>t.status==="open"),list=S.support.filter(t=>S.tkFilter==="all"||(S.tkFilter==="open"?t.status==="open":t.status!=="open"));
+  return `<div class="demo" style="background:var(--soft)"><span><b style="color:var(--ink)">모의 결제예요.</b> 실제 돈은 오가지 않고 카드 정보도 받지 않아요. 결제·환불·보상 흐름을 시험하는 용도예요.</span></div>
+  <section class="kpis">
+    <div class="kpi"><span class="kpi-l">모의 매출 (30일)</span><b class="kpi-v">${wonf(rev)}<small>원</small></b><span class="kpi-s">충전 ${nC}건</span></div>
+    <div class="kpi"><span class="kpi-l">결제 실패율</span><b class="kpi-v">${nC+nF?Math.round(nF/(nC+nF)*100):0}<small>%</small></b><span class="kpi-s">실패 ${nF}건 · 돈은 빠져나가지 않아요</span></div>
+    <div class="kpi"><span class="kpi-l">질문에 쓴 캐시</span><b class="kpi-v">${wonf(used)}</b><span class="kpi-s">유료 질문 ${cnt("spend")}건</span></div>
+    <div class="kpi"><span class="kpi-l">환불·보상 캐시</span><b class="kpi-v">${wonf(back)}</b><span class="kpi-s">환불 ${cnt("refund")}건 · 보상 ${cnt("comp")}건</span></div>
+  </section>
+  <div class="grid-side"><section class="qlist" id="tkList" aria-label="고객 지원 요청">
+      <div class="toolbar"><h2 style="margin-right:auto">고객 지원 요청</h2><div class="seg" id="tkF">${[["open",`처리할 요청 ${open.length}`],["done","완료"],["all","전체"]].map(([k,n])=>`<button data-f="${k}" aria-pressed="${S.tkFilter===k}">${n}</button>`).join("")}</div></div>
+      ${list.length?list.map(tkCard).join(""):`<div class="panel"><p class="empty">${S.tkFilter==="open"?"처리할 요청이 없어요.":"해당하는 요청이 없어요."}</p></div>`}
+    </section>
+    <aside style="display:flex;flex-direction:column;gap:14px">
+      <section class="panel"><h2>보상 기준</h2><div class="tw"><table><tbody>
+        <tr><td>답변 전 질문 취소</td><td class="r">쓴 캐시 전액 환불 (자동)</td></tr>
+        <tr><td>일반 질문 2시간 초과</td><td class="r">50캐시 (자동)</td></tr>
+        <tr><td>빠른 답변 30분 초과</td><td class="r">전액 환불 + 100캐시 (자동)</td></tr>
+        <tr><td>운영진이 질문 취소</td><td class="r">쓴 캐시 전액 환불 (자동)</td></tr>
+        <tr><td>문제·앱 오류 확인</td><td class="r">50~300캐시 (운영진)</td></tr>
+        <tr><td>결제 오류</td><td class="r">해당 캐시 + 100 (운영진)</td></tr>
+        <tr><td>계정 찾기·복구</td><td class="r">24시간 안 이메일 답변</td></tr></tbody></table></div></section>
+    </aside></div>
+  <section class="panel"><div class="ph"><h2>캐시 거래 내역</h2><p>최근 ${Math.min(60,S.tx.length)}건</p></div>
+    <div class="tw"><table><thead><tr><th>시간</th><th>학습자</th><th>종류</th><th class="r">캐시</th><th class="r">결제 금액</th><th class="r">잔액</th><th>내용</th></tr></thead>
+    <tbody>${S.tx.slice(0,60).map(t=>`<tr data-u="${esc(t.uid||"")}"><td>${when(t.at)}</td><td>${esc(t.name||t.email||"–")}</td><td><span class="chip ${t.type==="fail"?"bad":t.type==="charge"?"ok":t.type==="spend"?"mute":"warn"}">${TXL[t.type]||t.type}</span></td><td class="r num">${t.amt>0?"+":""}${wonf(t.amt||0)}</td><td class="r num">${t.won?wonf(t.won)+"원":"–"}</td><td class="r num">${t.bal!=null?wonf(t.bal):"–"}</td><td>${esc(t.memo||"")}</td></tr>`).join("")}</tbody></table>
+    ${S.tx.length?"":`<p class="empty">아직 거래가 없어요.</p>`}</div></section>`;
+}
+const maskEmail=e=>{const [a,b]=String(e||"").split("@");return b?a.slice(0,2)+"*".repeat(Math.max(2,a.length-2))+"@"+b:"–"};
+function tkCard(t){
+  const done=t.status!=="open",acc=t.type==="계정 찾기"||t.type==="비밀번호 문제";
+  const q=(S.tkFind[t.id]||"").trim().toLowerCase(),hits=q.length>=2?S.rows.filter(r=>r.name.toLowerCase().includes(q)||r.email.toLowerCase().includes(q)).slice(0,5):[];
+  return `<article class="q" data-tk="${esc(t.id)}">
+    <div class="qh"><span class="st ${done?"st-done":acc?"st-assigned":"st-late"}">${done?"처리 완료":t.type}</span>${done?`<span>${esc(t.type)}</span>`:""}<b>${esc(t.name||"로그인 안 함")}</b><span>${esc(t.email)}</span><span>${when(t.created)}</span>${!done?`<span${Date.now()-t.created>DAY?' style="color:var(--bad);font-weight:700"':""}>${dur(Date.now()-t.created)} 지남</span>`:""}</div>
+    <p class="qt">${esc(t.text)}</p>
+    ${done?`<div class="ans"><b>${esc(t.by||"운영진")} · ${when(t.doneAt)}</b>${esc(t.memo||"처리했어요.")}${t.comp?`\n보상 ${wonf(t.comp)}캐시 지급`:""}</div>`:`<div class="qa-act">
+      ${acc?`<div class="row"><label class="muted" for="tf-${esc(t.id)}" style="font-size:12.5px">가입 계정 찾기</label><input type="search" id="tf-${esc(t.id)}" data-find placeholder="이름이나 이메일 일부" value="${esc(S.tkFind[t.id]||"")}" style="flex:1"></div>
+        ${q.length>=2?(hits.length?`<ul class="rules" style="color:var(--ink)">${hits.map(r=>`<li>${esc(r.name)} · <b>${maskEmail(r.email)}</b> · Lv.${r.L} · 최근 학습 ${ago(r.last)}</li>`).join("")}</ul>`:`<p class="muted" style="margin:0;font-size:12.5px">맞는 학습자가 없어요.</p>`):""}`:""}
+      ${t.uid?`<div class="row"><span class="muted" style="font-size:12.5px">캐시 보상</span><select data-amt><option>50</option><option selected>100</option><option>300</option></select><select data-why>${COMP_REASONS.map(r=>`<option${(t.type==="결제 오류"&&r==="결제 오류")||(t.type==="앱·문제 오류"&&r==="문제 오류 확인")?" selected":""}>${r}</option>`).join("")}</select></div>`:""}
+      <textarea data-memo placeholder="처리 내용 (학습자에게 보낼 답장 요약)">${esc(S.tkMemo[t.id]||"")}</textarea>
+      <p class="err" id="te-${esc(t.id)}" hidden></p>
+      <div class="row" style="justify-content:flex-end">${t.uid?`<button class="btn ghost sm" data-act="comp">보상 지급하고 완료</button>`:""}<button class="btn sm" data-act="done">처리 완료</button></div></div>`}
+  </article>`;
+}
+function bindPay(){
+  $("tkF").onclick=e=>{const b=e.target.closest("[data-f]");if(b){S.tkFilter=b.dataset.f;render()}};
+  const L=$("tkList");
+  L.oninput=e=>{const c=e.target.closest("[data-tk]");if(!c)return;const id=c.dataset.tk;if(e.target.matches("[data-memo]"))S.tkMemo[id]=e.target.value;
+    if(e.target.matches("[data-find]")){S.tkFind[id]=e.target.value;const p=e.target.selectionStart;render();const i=$("tf-"+id);if(i){i.focus();try{i.setSelectionRange(p,p)}catch(x){}}}};
+  L.onclick=async e=>{const b=e.target.closest("[data-act]");if(!b)return;const c=b.closest("[data-tk]"),id=c.dataset.tk,t=S.support.find(x=>x.id===id);if(!t)return;
+    const memo=(S.tkMemo[id]||"").trim(),er=$("te-"+id);if(memo.length<5){er.textContent="처리 내용을 5자 이상 적어 주세요.";er.hidden=false;return}
+    const patch={status:"done",memo,doneAt:Date.now(),by:S.me?S.me.email:"데모 관리자"};
+    try{
+      if(b.dataset.act==="comp"){const amt=+c.querySelector("[data-amt]").value,why=c.querySelector("[data-why]").value;await grantComp(t.uid,t.name,amt,why,"comp",id);patch.comp=amt}
+      if(S.mode==="live"){const {F,db}=S.fb;await F.updateDoc(F.doc(db,"support",id),patch)}
+      Object.assign(t,patch);delete S.tkMemo[id];render();toast(patch.comp?`${wonf(patch.comp)}캐시를 지급하고 완료했어요. 학습자가 앱을 열면 들어가요.`:"처리 완료로 바꿨어요.");
+    }catch(x){er.textContent=fsErr(x);er.hidden=false}};
+  $("main").querySelectorAll("tr[data-u]").forEach(tr=>{if(tr.dataset.u&&S.rows.some(r=>r.id===tr.dataset.u))tr.onclick=()=>openUser(tr.dataset.u)});
+}
+S.tkFind={};S.tkMemo={};
+
+/* demo: 14 days of question arrivals, mock payments, support requests */
+function genOpsDemo(users){
+  const R=rng(7),t0=day0(Date.now()),prof={9:.3,10:.4,11:.5,12:.9,13:1,14:.6,15:.6,16:.7,17:.9,18:1.1,19:1.7,20:2.4,21:3.4,22:3.8,23:2.2};
+  const pois=l=>{let k=0,p=Math.exp(-l),s=p,u=R();while(u>s){k++;p*=l/k;s+=p}return k};
+  const hist=[];for(let d=13;d>=0;d--){const boost=d<=3?1.5:1;for(const h in prof){const n=pois(prof[h]*boost);for(let k=0;k<n;k++)hist.push(t0-d*DAY+(+h)*36e5+Math.floor(R()*36e5))}}
+  const tx=[],now=Date.now();
+  users.forEach(u=>{let bal=0;const pushT=(type,amt,memo,at,wonv)=>{bal+=amt;tx.push({id:"d"+tx.length,uid:u.id,name:u.d.name,email:u.d.email,type,amt,won:wonv||0,bal,memo,at})};
+    const st=now-Math.floor(5+R()*20)*DAY;pushT("earn",100,"첫 로그인 보너스",st);
+    for(let k=0;k<Math.floor(R()*5);k++)pushT("earn",10,"하루 목표 달성",st+(k+1)*DAY);
+    if(R()<.45){const P=[[1000,1000],[5000,5500],[10000,12000]][Math.floor(R()*3)],at=st+2*DAY+Math.floor(R()*3)*DAY;if(R()<.08)pushT("fail",0,`${wonf(P[0])}원 결제 실패 (모의 카드)`,at-6e5,P[0]);pushT("charge",P[1],`${wonf(P[0])}원 충전 (${R()<.5?"모의 카드":"모의 간편결제"})`,at,P[0])}
+    if(bal>=200&&R()<.7){const fast=bal>=500&&R()<.4,c=200+(fast?300:0);pushT("spend",-c,`선배 질문${fast?" · 빠른 답변":""}`,now-Math.floor(R()*4)*DAY-36e5);if(R()<.4)pushT(fast?"refund":"comp",fast?c:50,fast?"빠른 답변 지연 환불":"답변 지연 보상",now-Math.floor(R()*3)*DAY)}
+  });
+  tx.sort((a,b)=>b.at-a.at);
+  const sup=[
+    {id:"s1",type:"계정 찾기",email:"minji.k@example.com",uid:null,name:"",text:"폰을 바꿨는데 어떤 이메일로 가입했는지 기억이 안 나요. 닉네임은 민지, 레벨은 10 정도였어요.",status:"open",created:now-5*36e5},
+    {id:"s2",type:"앱·문제 오류",email:users[11].d.email,uid:users[11].id,name:users[11].d.name,text:"N3 문법 퀴즈에서 정답이 두 개처럼 보이는 문제가 있어요. 「〜ても」 문제요.",status:"open",created:now-26*36e5},
+    {id:"s3",type:"결제 오류",email:users[6].d.email,uid:users[6].id,name:users[6].d.name,text:"5,000원 결제 완료 화면은 떴는데 캐시가 안 들어왔어요.",status:"open",created:now-50*6e4},
+    {id:"s4",type:"비밀번호 문제",email:users[2].d.email,uid:null,name:"",text:"비밀번호 재설정 메일이 안 와요.",status:"done",memo:"스팸함 확인 안내, 재발송 후 로그인 확인",by:"데모 관리자",doneAt:now-2*DAY,created:now-2*DAY-3*36e5}
+  ];
+  return {hist,tx,sup};
+}
+
 /* ---------- start ---------- */
 const h0=location.hash.slice(1);if(TABS.some(x=>x[0]===h0))S.tab=h0;
-if(S.mode==="demo"){const D=genDemo();S.users=D.users;S.qs=D.qs;S.cfgAt=0;rebuild();render()}else startLive();
+if(S.mode==="demo"){const D=genDemo();S.users=D.users;S.qs=D.qs;S.cfgAt=0;const O=genOpsDemo(D.users);S.hist=O.hist;S.tx=O.tx;S.support=O.sup;rebuild();render()}else startLive();
 setInterval(()=>{if(S.tab==="qa"&&!S.gate&&!$("layer").innerHTML){const L=$("qaList");if(L&&L.contains(document.activeElement))return;render()}},60000);
 </script>
 </body>
